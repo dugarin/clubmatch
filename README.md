@@ -24,3 +24,6 @@
 5. [Сценарии использования (UC)](docs/requirements/05-use-cases.md)
 6. [Критерии приёмки (AC)](docs/requirements/06-acceptance-criteria.md)
 7. [Открытые вопросы](docs/requirements/07-open-questions.md)
+8. [Опросник для утверждения заказчиком](docs/requirements/08-approval-form.md)
+
+План дальнейших работ: [roadmap](docs/roadmap.md) (закрытие спецификации → архитектура).
