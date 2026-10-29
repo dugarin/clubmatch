@@ -74,4 +74,4 @@
 | Аватар (из Telegram) | нет | да |
 | Telegram-контакт | нет | да |
 
-Статус: draft (2026-10-29, решения заказчика внесены; до spec 1.0 — повторное ревью). Критерии приёмки: [06-acceptance-criteria](06-acceptance-criteria.md).
+Статус: spec 1.0 (2026-10-29). Критерии приёмки: [06-acceptance-criteria](06-acceptance-criteria.md).

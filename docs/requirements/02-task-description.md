@@ -37,4 +37,4 @@
 - Не романтические знакомства: только профессиональный нетворкинг.
 - Масштабирование на открытую аудиторию — отдельный этап, в MVP не входит.
 
-Статус: draft (2026-10-29, решения заказчика внесены; до spec 1.0 — повторное ревью). Глоссарий: [01-glossary](01-glossary.md). Далее: [03-functional-requirements](03-functional-requirements.md).
+Статус: spec 1.0 (2026-10-29). Глоссарий: [01-glossary](01-glossary.md). Далее: [03-functional-requirements](03-functional-requirements.md).

@@ -104,4 +104,4 @@
 
 Все FR-1…FR-17 покрыты хотя бы одним UC.
 
-Статус: draft (2026-10-29, решения заказчика внесены; до spec 1.0 — повторное ревью). Критерии приёмки: [06-acceptance-criteria](06-acceptance-criteria.md).
+Статус: spec 1.0 (2026-10-29). Критерии приёмки: [06-acceptance-criteria](06-acceptance-criteria.md).
