@@ -1,0 +1,171 @@
+# Stage-окружение (задача 3.0.6, docs/phase-3-plan.md; трассировка Q-1.3, NFR-6, NFR-10).
+# Документация развёртывания: docs/ops/stage.md. Откат и CD: docs/ops/deploy.md.
+#
+# Отличия от docker-compose.yml (dev):
+#  - секреты только через .env на сервере (POSTGRES_PASSWORD обязателен; в репо — только .env.example);
+#  - Caddy перед server: автоматический TLS (конфиг ops/caddy/Caddyfile);
+#  - goose-миграции (сервис migrate) выполняются до старта server/worker;
+#  - restart-политики и ротация логов (json-file, 10m x 3);
+#  - профиль monitoring (задача 3.0.8): prometheus + node-exporter, конфиги ops/prometheus/.
+#
+# Образы собираются на сервере из git (registry не выбран — ADR-001, Q-1.2).
+# TODO(registry): когда выбран — в server/worker заменить build на image: с тегом.
+
+name: clubmatch-stage
+
+# Ротация логов контейнеров: диск сервера не забивается журналами (риск из 05-risks, NFR-6/NFR-10)
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-clubmatch}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-clubmatch}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-clubmatch} -d ${POSTGRES_DB:-clubmatch}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # порт наружу НЕ публикуем: БД доступна только в compose-сети.
+    # Бэкап/восстановление — ops/backup.sh, ops/restore.sh (через docker compose exec).
+    logging: *default-logging
+
+  migrate:
+    # goose-миграции; та же версия, что в docker-compose.yml и Makefile: goose v3.24.1, db/migrations.
+    # One-shot: запускается разово, server/worker ждут его успешного завершения.
+    # Кэш-томы, чтобы не перекачивать/перекомпилировать goose при каждом деплое.
+    # Оперативные команды (переопределяют хвост entrypoint, см. docs/ops/deploy.md):
+    #   docker compose -f docker-compose.stage.yml run --rm migrate status
+    #   docker compose -f docker-compose.stage.yml run --rm migrate down   # РАЗРУШИТЕЛЬНО
+    image: golang:1.25-alpine
+    working_dir: /src
+    volumes:
+      - .:/src:ro
+      - goose-mod-cache:/go/pkg/mod
+      - goose-build-cache:/root/.cache/go-build
+    environment: &app-db-env
+      # На stage БД — соседний контейнер db: это значение ПЕРЕКРЫВАЕТ DATABASE_URL из .env.
+      # DSN собирается из тех же переменных, что и аргумент goose ниже, — не разъедутся.
+      DATABASE_URL: postgres://${POSTGRES_USER:-clubmatch}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@db:5432/${POSTGRES_DB:-clubmatch}?sslmode=disable
+    entrypoint:
+      [
+        "go", "run", "github.com/pressly/goose/v3/cmd/goose@v3.24.1",
+        "-dir", "db/migrations", "postgres",
+        "postgres://${POSTGRES_USER:-clubmatch}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@db:5432/${POSTGRES_DB:-clubmatch}?sslmode=disable",
+      ]
+    command: ["up"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    logging: *default-logging
+
+  server:
+    build:
+      context: .
+      args:
+        BINARY: server
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # <<: YAML-merge из anchor &app-db-env (DATABASE_URL на stage) + свои переменные
+      <<: *app-db-env
+      APP_ENV: stage
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    # порт наружу НЕ публикуем — весь внешний трафик идёт через caddy
+    logging: *default-logging
+
+  worker:
+    build:
+      context: .
+      args:
+        BINARY: worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-db-env
+      APP_ENV: stage
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    # TODO(эпик 5, 3.5.1): liveness worker — heartbeat-запись в БД (05-risks);
+    # сейчас индикатор живости — рестарт-политика и логи.
+    logging: *default-logging
+
+  caddy:
+    # Reverse proxy с автоматическим TLS (Let's Encrypt). Домен — STAGE_DOMAIN из .env.
+    image: caddy:2.11.7-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    environment:
+      STAGE_DOMAIN: ${STAGE_DOMAIN:?STAGE_DOMAIN must be set in .env}
+    volumes:
+      - ./ops/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # ACME-сертификаты: переживают пересоздание контейнера
+      - caddy_config:/config
+    depends_on:
+      server:
+        condition: service_healthy
+    logging: *default-logging
+
+  # ── Профиль monitoring (задача 3.0.8): docker compose ... --profile monitoring up -d ──
+
+  prometheus:
+    image: prom/prometheus:v3.15.1
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./ops/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    # Доступ к UI — только через SSH-туннель (см. docs/ops/stage.md), наружу не published
+    ports:
+      - "127.0.0.1:9090:9090"
+    logging: *default-logging
+
+  node-exporter:
+    # Метрики ХОСТА (диск — алерт HostDiskAlmostFull; источник данных для «свободное место» из 05-risks)
+    image: prom/node-exporter:v1.12.1
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    command:
+      - --path.rootfs=/host # метрики ФС сервера, а не контейнера
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    logging: *default-logging
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+  prometheus_data:
+  goose-mod-cache:
+  goose-build-cache:

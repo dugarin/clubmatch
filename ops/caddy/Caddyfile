@@ -1,0 +1,26 @@
+# Reverse proxy stage (задача 3.0.6). Caddy получает и продлевает TLS-сертификат
+# автоматически (ACME/Let's Encrypt). Требования: STAGE_DOMAIN в .env, A-запись домена →
+# IP сервера, порты 80/443 доступны извне. Проверка конфига: docker run --rm \
+# -e STAGE_DOMAIN=... -v $PWD/ops/caddy/Caddyfile:/etc/caddy/Caddyfile:ro \
+# caddy:2.11.7-alpine caddy validate --config /etc/caddy/Caddyfile
+#
+# /metrics наружу НЕ проксируется: Prometheus скрейпит server:8080 внутри compose-сети.
+
+{
+	# email для уведомлений Let's Encrypt (истечение/проблемы) — раскомментировать и указать:
+	# email admin@example.com
+}
+
+{$STAGE_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		# Базовые заголовки безопасности (Mini App открывается в webview Telegram)
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	reverse_proxy server:8080
+}

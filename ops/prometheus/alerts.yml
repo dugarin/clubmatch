@@ -1,0 +1,92 @@
+# Базовые alert-правила (задача 3.0.8) по таблице «Метрики»
+# docs/architecture/05-risks-observability.md. Проверка: promtool check config.
+#
+# Доставка алертов пока НИКУДА не настроена (Alertmanager не развёрнут — вопрос владельцу,
+# см. docs/ops/stage.md): состояние видно в UI Prometheus http://127.0.0.1:9090/alerts.
+#
+# Ожидаемое состояние ДО эпика 7:
+#  - /metrics у backend отсутствует → job clubmatch-server DOWN → ClubmatchServerDown в FIRING
+#    (это же подтверждает DoD 3.0.8 «алерт недоступности срабатывает»);
+#  - метрики outbox_*/notification_lag/http_latency_p95 появятся в 3.5.1 / 3.7.1 —
+#    до этого выражения пусты и алерты не активируются.
+
+groups:
+  # 05-risks: «недоступность > 5 мин» (NFR-6)
+  - name: clubmatch-availability
+    rules:
+      - alert: ClubmatchServerDown
+        expr: up{job="clubmatch-server"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "stage: backend недоступен для Prometheus"
+          description: "Scrape /metrics (job clubmatch-server) падал 5 минут подряд. До задачи 3.7.1 — ожидаемо: эндпоинт /metrics ещё не реализован."
+
+      - alert: NodeExporterDown
+        expr: up{job="node"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "stage: node-exporter недоступен"
+          description: "Мониторинг хоста (алерты по диску) не работает — проверьте контейнер node-exporter."
+
+  # 05-risks: outbox_depth / outbox_oldest_age / notification_lag (NFR-12)
+  - name: clubmatch-outbox
+    rules:
+      - alert: ClubmatchOutboxStalled
+        # 05-risks: «age > 10 мин» — самая старая неотправленная запись outbox
+        expr: outbox_oldest_age_seconds > 600
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "outbox: старейшая запись > 10 мин (NFR-12 — до 1 мин)"
+          description: "Worker не справляется или Bot API недоступен; см. логи worker (docker compose -f docker-compose.stage.yml logs worker). Метрика появится в 3.5.1/3.7.1."
+
+      - alert: ClubmatchNotificationLagHigh
+        # 05-risks: «p95 > 60 с». TODO(3.5.1/3.7.1): формат метрики (gauge с quantile
+        # или histogram) зафиксирует реализация; при histogram выражение сменится на
+        # histogram_quantile(0.95, rate(notification_lag_seconds_bucket[5m])) > 60
+        expr: notification_lag_seconds{quantile="0.95"} > 60
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 задержки уведомлений > 60 c (NFR-12)"
+
+      # TODO(3.7.1): порог по outbox_depth в 05-risks не задан — определить по baseline stage.
+
+  # 05-risks: «p95 поиск > 4 с, 15 мин» (NFR-2: бюджет 5 с)
+  - name: clubmatch-latency
+    rules:
+      - alert: ClubmatchSearchLatencyHigh
+        # TODO(3.4.4/3.7.1): значения label endpoint зафиксирует реализация поиска
+        expr: http_latency_p95{endpoint=~".*search.*"} > 4
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 поиска > 4 с в течение 15 мин (NFR-2)"
+
+  # 05-risks: «свободное место» (NFR-6, NFR-10)
+  - name: clubmatch-host
+    rules:
+      - alert: HostDiskAlmostFull
+        # node-exporter запущен с --path.rootfs=/host → метрики ФС сервера (mountpoint="/")
+        expr: (node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "свободно < 10% на / сервера stage"
+          description: "Рост: pgdata, docker-образы, логи, бэкапы (ops/backup.sh). Порог 10% — [предположение], настроить под диск сервера."
+
+      - alert: HostDiskCritical
+        expr: (node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.05
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "свободно < 5% на / сервера stage — риск отказа БД (NFR-6)"

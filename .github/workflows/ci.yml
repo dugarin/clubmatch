@@ -1,0 +1,174 @@
+# CI (задача 3.0.5, docs/phase-3-plan.md; трассировка Q-3 ред.2).
+# Платформа: GitHub Actions (git remote: git@github.com:dugarin/clubmatch.git).
+#
+# Состав: lint (golangci-lint v2) → go test → сборка docker-образов server/worker (БЕЗ push)
+#          + проверка синтаксиса ops-конфигов (compose/prometheus/caddy).
+#
+# Push в registry НЕ включён: registry не выбран (ADR-001, вопрос Q-1.2 — решение владельца).
+# Шаг push закомментирован и включается переменной репозитория vars.REGISTRY_PUSH='true'.
+#
+# Mini App (React+TS, задача 3.0.2): job для фронта — закомментированный шаблон внизу файла;
+# добавить при появлении каталога frontend/.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint (golangci-lint)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod # go 1.25.0
+
+      # .golangci.yml — конфиг формата v2; версия линтера запинана
+      # (проверена локально через docker golangci/golangci-lint:v2.15.0)
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.15.0
+
+  test:
+    name: go test
+    runs-on: ubuntu-latest
+    services:
+      # Postgres для интеграционных тестов эпиков 2+ (миграции, репозитории).
+      # Текущие unit-тесты (internal/config) БД не требуют — сервис поднят заранее.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: clubmatch
+          POSTGRES_PASSWORD: clubmatch
+          POSTGRES_DB: clubmatch
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clubmatch"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://clubmatch:clubmatch@localhost:5432/clubmatch?sslmode=disable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: go test
+        run: go test -race ./...
+
+  docker:
+    name: docker build (${{ matrix.binary }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        binary: [server, worker] # один Dockerfile, ARG BINARY
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build image (no push)
+        run: docker build --build-arg BINARY=${{ matrix.binary }} --tag clubmatch-${{ matrix.binary }}:ci .
+
+      # ── Push в registry: включить, когда владелец выберет registry ──────────────
+      # Задать в репозитории (Settings → Variables/Secrets):
+      #   vars.REGISTRY_PUSH='true', vars.REGISTRY (например ghcr.io),
+      #   vars.IMAGE_PREFIX (например dugarin/clubmatch),
+      #   secrets.REGISTRY_USERNAME, secrets.REGISTRY_PASSWORD
+      # ─────────────────────────────────────────────────────────────────────────────
+      # - name: Login to registry
+      #   if: vars.REGISTRY_PUSH == 'true'
+      #   uses: docker/login-action@v4
+      #   with:
+      #     registry: ${{ vars.REGISTRY }}
+      #     username: ${{ secrets.REGISTRY_USERNAME }}
+      #     password: ${{ secrets.REGISTRY_PASSWORD }}
+      #
+      # - name: Tag & push image
+      #   if: vars.REGISTRY_PUSH == 'true'
+      #   env:
+      #     REGISTRY: ${{ vars.REGISTRY }}
+      #     IMAGE_PREFIX: ${{ vars.IMAGE_PREFIX }}
+      #   run: |
+      #     IMAGE="$REGISTRY/$IMAGE_PREFIX-${{ matrix.binary }}"
+      #     docker tag "clubmatch-${{ matrix.binary }}:ci" "$IMAGE:${GITHUB_SHA::12}"
+      #     docker tag "clubmatch-${{ matrix.binary }}:ci" "$IMAGE:latest"
+      #     docker push "$IMAGE:${GITHUB_SHA::12}"
+      #     docker push "$IMAGE:latest"
+      # ─────────────────────────────────────────────────────────────────────────────
+
+  ops-files:
+    name: validate ops configs
+    runs-on: ubuntu-latest
+    env:
+      # Значения-заглушки только для проверки синтаксиса: секретов не требуется.
+      POSTGRES_PASSWORD: ci-placeholder-password
+      STAGE_DOMAIN: ci-placeholder.example.com
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # compose требует существования env_file (.env в git не хранится)
+      - name: Prepare .env
+        run: cp .env.example .env
+
+      - name: docker compose config (dev + stage)
+        run: |
+          docker compose -f docker-compose.yml config --quiet
+          docker compose -f docker-compose.stage.yml --profile monitoring config --quiet
+
+      - name: promtool check config (+ alert-правила)
+        run: >-
+          docker run --rm
+          --volume "$PWD/ops/prometheus:/etc/prometheus:ro"
+          prom/prometheus:v3.15.1
+          promtool check config /etc/prometheus/prometheus.yml
+
+      - name: caddy validate
+        run: >-
+          docker run --rm
+          --env STAGE_DOMAIN="$STAGE_DOMAIN"
+          --volume "$PWD/ops/caddy/Caddyfile:/etc/caddy/Caddyfile:ro"
+          caddy:2.11.7-alpine
+          caddy validate --config /etc/caddy/Caddyfile
+
+  # ── Mini App (фронтенд) — раскомментировать при появлении каталога frontend/ (задача 3.0.2) ──
+  # frontend:
+  #   name: frontend (lint + build)
+  #   runs-on: ubuntu-latest
+  #   defaults:
+  #     run:
+  #       working-directory: frontend
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v7
+  #     - name: Setup Node
+  #       uses: actions/setup-node@v7
+  #       with:
+  #         node-version: 22
+  #         cache: npm
+  #         cache-dependency-path: frontend/package-lock.json
+  #     - run: npm ci
+  #     - run: npm run lint
+  #     - run: npm run build

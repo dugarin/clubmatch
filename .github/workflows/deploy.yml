@@ -1,0 +1,160 @@
+# CD (задача 3.0.7, docs/phase-3-plan.md; трассировка Q-3 ред.2, NFR-6).
+#
+# stage — по мерджу в main; prod — по тегу v* (и вручную: workflow_dispatch).
+# Деплой: SSH на сервер (self-hosted, ADR-001) → git reset до коммита → goose-миграции →
+# docker compose up -d --build. Полная документация и ОТКАТ: docs/ops/deploy.md.
+#
+# ОБА job ВЫКЛЮЧЕНЫ по умолчанию (vars.DEPLOY_STAGE_ENABLED / DEPLOY_PROD_ENABLED != 'true')
+# и просто пропускаются, пока владелец не задаст секреты сервера (см. docs/ops/deploy.md,
+# раздел «Секреты и переменные»). Это сознательно: пайплайн зелёный без сервера.
+#
+# registry не выбран (ADR-001, Q-1.2) → образы собираются НА СЕРВЕРЕ из git.
+# Когда появится registry — сменить шаг деплоя на pull образов (docs/ops/deploy.md,
+# раздел «Переезд на registry»).
+
+name: CD
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Куда деплоить'
+        type: choice
+        options: [stage, prod]
+        default: stage
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  # деплои в одно окружение не выполняются параллельно и не прерываются на середине
+  group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.target || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-stage:
+    name: Deploy → stage
+    runs-on: ubuntu-latest
+    # TODO(владелец): задать vars.DEPLOY_STAGE_ENABLED='true' + секреты STAGE_* (docs/ops/deploy.md)
+    if: >-
+      vars.DEPLOY_STAGE_ENABLED == 'true' &&
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+       github.event_name == 'workflow_dispatch' && inputs.target == 'stage')
+    environment: stage # GitHub-environment 'stage' (опц. защита: required reviewers)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.STAGE_SSH_PRIVATE_KEY }}
+
+      - name: Deploy over SSH
+        env:
+          SSH_HOST: ${{ secrets.STAGE_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGE_SSH_USER }}
+          SSH_PORT: ${{ vars.STAGE_SSH_PORT || '22' }}
+          SSH_KNOWN_HOSTS: ${{ secrets.STAGE_SSH_KNOWN_HOSTS }}
+          DEPLOY_DIR: ${{ vars.STAGE_DEPLOY_DIR || '/opt/clubmatch' }}
+        run: |
+          set -euo pipefail
+          SSH_OPTS=(-p "$SSH_PORT" -o BatchMode=yes)
+          if [ -n "$SSH_KNOWN_HOSTS" ]; then
+            # рекомендованный режим: хост-ключ сервера запинан секретом STAGE_SSH_KNOWN_HOSTS
+            printf '%s\n' "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          else
+            # TOFU до появления секрета STAGE_SSH_KNOWN_HOSTS
+            SSH_OPTS+=(-o StrictHostKeyChecking=accept-new)
+          fi
+
+          ssh "${SSH_OPTS[@]}" "$SSH_USER@$SSH_HOST" \
+            "DEPLOY_SHA='$GITHUB_SHA' DEPLOY_REF='main' DEPLOY_DIR='$DEPLOY_DIR' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          echo "== deploy $DEPLOY_REF @ $DEPLOY_SHA =="
+
+          # 0) код
+          git fetch --prune --tags origin
+          git checkout --force "$DEPLOY_REF"
+          git reset --hard "$DEPLOY_SHA"
+
+          # 1) goose-миграции — отдельный шаг пайплайна (идемпотентно: применяется только новое;
+          #    тот же запуск потом отработает и через depends_on в docker-compose.stage.yml)
+          docker compose -f docker-compose.stage.yml run --rm migrate
+
+          # 2) пересборка и рестарт (migrate, db, server, worker, caddy; профиль monitoring не трогается)
+          docker compose -f docker-compose.stage.yml up -d --build --remove-orphans
+
+          # 3) пост-проверка
+          sleep 10
+          docker compose -f docker-compose.stage.yml ps
+          docker compose -f docker-compose.stage.yml exec -T server wget -qO- http://localhost:8080/healthz
+          echo "== deploy OK =="
+          REMOTE
+
+  deploy-prod:
+    name: Deploy → prod
+    runs-on: ubuntu-latest
+    # prod-сервер не выбран (ADR-001: self-hosted, подрядчик не выбран; прод — позже).
+    # Структура job готова; включить: vars.DEPLOY_PROD_ENABLED='true' + секреты PROD_*.
+    if: >-
+      vars.DEPLOY_PROD_ENABLED == 'true' &&
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') ||
+       github.event_name == 'workflow_dispatch' && inputs.target == 'prod')
+    environment: prod # ОБЯЗАТЕЛЬНО настроить required reviewers на environment 'prod'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+
+      - name: Deploy over SSH
+        env:
+          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          SSH_PORT: ${{ vars.PROD_SSH_PORT || '22' }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+          DEPLOY_DIR: ${{ vars.PROD_DEPLOY_DIR || '/opt/clubmatch' }}
+          DEPLOY_REF: ${{ github.ref_name }} # тег v*
+        run: |
+          set -euo pipefail
+          SSH_OPTS=(-p "$SSH_PORT" -o BatchMode=yes)
+          if [ -n "$SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          else
+            SSH_OPTS+=(-o StrictHostKeyChecking=accept-new)
+          fi
+
+          ssh "${SSH_OPTS[@]}" "$SSH_USER@$SSH_HOST" \
+            "DEPLOY_SHA='$GITHUB_SHA' DEPLOY_REF='$DEPLOY_REF' DEPLOY_DIR='$DEPLOY_DIR' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          echo "== deploy $DEPLOY_REF @ $DEPLOY_SHA =="
+
+          # 0) код
+          git fetch --prune --tags origin
+          git checkout --force "$DEPLOY_REF"
+          git reset --hard "$DEPLOY_SHA"
+
+          # 1) goose-миграции
+          docker compose -f docker-compose.stage.yml run --rm migrate
+
+          # 2) пересборка и рестарт
+          # TODO(prod): при вводе прода — отдельный docker-compose.prod.yml
+          # (образы из registry, своя БД/домен; см. docs/ops/deploy.md)
+          docker compose -f docker-compose.stage.yml up -d --build --remove-orphans
+
+          # 3) пост-проверка
+          sleep 10
+          docker compose -f docker-compose.stage.yml ps
+          docker compose -f docker-compose.stage.yml exec -T server wget -qO- http://localhost:8080/healthz
+          echo "== deploy OK =="
+          REMOTE
