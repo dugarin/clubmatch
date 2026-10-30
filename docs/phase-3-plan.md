@@ -1,6 +1,6 @@
 # Фаза 3. Декомпозиция на задачи разработки
 
-Вход: spec 1.1 (docs/requirements), архитектура фазы 2 ([01-domain-model](architecture/01-domain-model.md), [ADR-001…004](architecture), [04-openapi.yaml](architecture/04-openapi.yaml)). Стек принят: Go 1.23 + chi + sqlc/pgx + goose, PostgreSQL 16, Mini App React+TS, self-hosted.
+Вход: spec 1.1 (docs/requirements), архитектура фазы 2 ([01-domain-model](architecture/01-domain-model.md), [ADR-001…004](architecture), [04-openapi.yaml](architecture/04-openapi.yaml)). Стек принят: Go 1.25 + chi + sqlc/pgx + goose (Go поднят с 1.23 до 1.25 — требование pgx v5.11, 2026-10-30), PostgreSQL 16, Mini App React+TS, self-hosted.
 
 Формат задачи: объём → трассировка → критерий готовности (DoD). Порядок внутри эпика — по зависимостям. Оценки не даются `[предположение: команда и скорость неизвестны]`.
 

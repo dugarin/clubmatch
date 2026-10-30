@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: clubmatch
+      POSTGRES_PASSWORD: clubmatch
+      POSTGRES_DB: clubmatch
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clubmatch"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    image: golang:1.25-alpine
+    working_dir: /src
+    volumes:
+      - .:/src
+    command: ["go", "run", "github.com/pressly/goose/v3/cmd/goose@v3.24.1", "-dir", "db/migrations", "postgres", "postgres://clubmatch:clubmatch@db:5432/clubmatch?sslmode=disable", "up"]
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["tools"]
+
+  server:
+    build:
+      context: .
+      args:
+        BINARY: server
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://clubmatch:clubmatch@db:5432/clubmatch?sslmode=disable
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      args:
+        BINARY: worker
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://clubmatch:clubmatch@db:5432/clubmatch?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
