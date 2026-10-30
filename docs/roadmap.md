@@ -34,7 +34,8 @@
 | 2.8 | OpenAPI-контракт | Каждый эндпоинт трассируется к FR/UC; пересчёт матрицы покрытия | [x] draft: [architecture/04-openapi.yaml](architecture/04-openapi.yaml) + [04b-coverage-matrix.md](architecture/04b-coverage-matrix.md) (пробелов нет) |
 | 2.9 | Список рисков + observability | По handoff-формату architecture skill | [x] draft: [architecture/05-risks-observability.md](architecture/05-risks-observability.md) |
 
-Свод открытых вопросов фазы 2 (решения принимает владелец): [architecture/06-open-questions.md](architecture/06-open-questions.md).
+Свод открытых вопросов фазы 2 (решения принимает владелец): [architecture/06-open-questions.md](architecture/06-open-questions.md);
+опросник для утверждения: [architecture/07-approval-form.md](architecture/07-approval-form.md) (отправлен владельцу 2026-10-30).
 
 Каждый ADR — кандидат на решение с ≥2 альтернативами; решение принимает владелец.
 
