@@ -11,6 +11,29 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const deleteProfileTagsByKind = `-- name: DeleteProfileTagsByKind :exec
+DELETE FROM profile_tag WHERE profile_id = $1 AND kind = $2
+`
+
+type DeleteProfileTagsByKindParams struct {
+	ProfileID pgtype.UUID
+	Kind      ProfileTagKind
+}
+
+func (q *Queries) DeleteProfileTagsByKind(ctx context.Context, arg DeleteProfileTagsByKindParams) error {
+	_, err := q.db.Exec(ctx, deleteProfileTagsByKind, arg.ProfileID, arg.Kind)
+	return err
+}
+
+const deleteProjectsByProfileID = `-- name: DeleteProjectsByProfileID :exec
+DELETE FROM project WHERE profile_id = $1
+`
+
+func (q *Queries) DeleteProjectsByProfileID(ctx context.Context, profileID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteProjectsByProfileID, profileID)
+	return err
+}
+
 const getProfileByUserID = `-- name: GetProfileByUserID :one
 SELECT user_id, first_name, last_name, location, location_norm, meeting_format, is_searchable, updated_at
 FROM profile WHERE user_id = $1
@@ -41,6 +64,156 @@ func (q *Queries) GetProfileByUserID(ctx context.Context, userID pgtype.UUID) (G
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const getProfileSelf = `-- name: GetProfileSelf :one
+SELECT p.user_id, p.first_name, p.last_name, p.location, p.meeting_format, p.is_searchable, p.updated_at,
+       (u.chat_id IS NOT NULL)::bool AS bot_linked
+FROM profile p
+JOIN users u ON u.id = p.user_id
+WHERE p.user_id = $1
+`
+
+type GetProfileSelfRow struct {
+	UserID        pgtype.UUID
+	FirstName     string
+	LastName      *string
+	Location      *string
+	MeetingFormat MeetingFormat
+	IsSearchable  bool
+	UpdatedAt     pgtype.Timestamptz
+	BotLinked     bool
+}
+
+func (q *Queries) GetProfileSelf(ctx context.Context, userID pgtype.UUID) (GetProfileSelfRow, error) {
+	row := q.db.QueryRow(ctx, getProfileSelf, userID)
+	var i GetProfileSelfRow
+	err := row.Scan(
+		&i.UserID,
+		&i.FirstName,
+		&i.LastName,
+		&i.Location,
+		&i.MeetingFormat,
+		&i.IsSearchable,
+		&i.UpdatedAt,
+		&i.BotLinked,
+	)
+	return i, err
+}
+
+const insertProfileTag = `-- name: InsertProfileTag :exec
+INSERT INTO profile_tag (profile_id, tag_id, kind)
+VALUES ($1, $2, $3)
+ON CONFLICT (profile_id, tag_id, kind) DO NOTHING
+`
+
+type InsertProfileTagParams struct {
+	ProfileID pgtype.UUID
+	TagID     pgtype.UUID
+	Kind      ProfileTagKind
+}
+
+func (q *Queries) InsertProfileTag(ctx context.Context, arg InsertProfileTagParams) error {
+	_, err := q.db.Exec(ctx, insertProfileTag, arg.ProfileID, arg.TagID, arg.Kind)
+	return err
+}
+
+const insertProject = `-- name: InsertProject :exec
+INSERT INTO project (profile_id, text, position) VALUES ($1, $2, $3)
+`
+
+type InsertProjectParams struct {
+	ProfileID pgtype.UUID
+	Text      string
+	Position  int16
+}
+
+func (q *Queries) InsertProject(ctx context.Context, arg InsertProjectParams) error {
+	_, err := q.db.Exec(ctx, insertProject, arg.ProfileID, arg.Text, arg.Position)
+	return err
+}
+
+const listProfileTagCanonicals = `-- name: ListProfileTagCanonicals :many
+SELECT t.canonical
+FROM profile_tag pt
+JOIN tag t ON t.id = pt.tag_id
+WHERE pt.profile_id = $1 AND pt.kind = $2 AND t.status = 'active'
+ORDER BY t.canonical
+`
+
+type ListProfileTagCanonicalsParams struct {
+	ProfileID pgtype.UUID
+	Kind      ProfileTagKind
+}
+
+func (q *Queries) ListProfileTagCanonicals(ctx context.Context, arg ListProfileTagCanonicalsParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, listProfileTagCanonicals, arg.ProfileID, arg.Kind)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var canonical string
+		if err := rows.Scan(&canonical); err != nil {
+			return nil, err
+		}
+		items = append(items, canonical)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProjectTexts = `-- name: ListProjectTexts :many
+SELECT text FROM project WHERE profile_id = $1 ORDER BY position
+`
+
+func (q *Queries) ListProjectTexts(ctx context.Context, profileID pgtype.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, listProjectTexts, profileID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var text string
+		if err := rows.Scan(&text); err != nil {
+			return nil, err
+		}
+		items = append(items, text)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const rebuildProfileFTS = `-- name: RebuildProfileFTS :exec
+UPDATE profile p
+SET fts_doc =
+    setweight(to_tsvector('russian', coalesce((
+        SELECT string_agg(t.canonical, ' ')
+        FROM profile_tag pt JOIN tag t ON t.id = pt.tag_id
+        WHERE pt.profile_id = p.user_id AND pt.kind = 'skill' AND t.status = 'active'), '')), 'A') ||
+    setweight(to_tsvector('russian', coalesce((
+        SELECT string_agg(pr.text, ' ') FROM project pr
+        WHERE pr.profile_id = p.user_id), '')), 'B') ||
+    setweight(to_tsvector('russian', coalesce((
+        SELECT string_agg(t.canonical, ' ')
+        FROM profile_tag pt JOIN tag t ON t.id = pt.tag_id
+        WHERE pt.profile_id = p.user_id AND pt.kind = 'professional_interest' AND t.status = 'active'), '')), 'C') ||
+    setweight(to_tsvector('russian', coalesce((
+        SELECT string_agg(t.canonical, ' ')
+        FROM profile_tag pt JOIN tag t ON t.id = pt.tag_id
+        WHERE pt.profile_id = p.user_id AND pt.kind = 'personal_interest' AND t.status = 'active'), '')), 'D')
+WHERE p.user_id = $1
+`
+
+func (q *Queries) RebuildProfileFTS(ctx context.Context, userID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, rebuildProfileFTS, userID)
+	return err
 }
 
 const upsertProfile = `-- name: UpsertProfile :exec

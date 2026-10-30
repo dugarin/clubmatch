@@ -7,7 +7,29 @@ package store
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const getUserByTelegramID = `-- name: GetUserByTelegramID :one
+SELECT id, telegram_user_id, telegram_username, role, access_state, created_at, deleted_at, chat_id FROM users WHERE telegram_user_id = $1 AND deleted_at IS NULL
+`
+
+func (q *Queries) GetUserByTelegramID(ctx context.Context, telegramUserID int64) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByTelegramID, telegramUserID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.TelegramUserID,
+		&i.TelegramUsername,
+		&i.Role,
+		&i.AccessState,
+		&i.CreatedAt,
+		&i.DeletedAt,
+		&i.ChatID,
+	)
+	return i, err
+}
 
 const setUserChatID = `-- name: SetUserChatID :exec
 UPDATE users SET chat_id = $2 WHERE telegram_user_id = $1
@@ -20,6 +42,18 @@ type SetUserChatIDParams struct {
 
 func (q *Queries) SetUserChatID(ctx context.Context, arg SetUserChatIDParams) error {
 	_, err := q.db.Exec(ctx, setUserChatID, arg.TelegramUserID, arg.ChatID)
+	return err
+}
+
+const setUserOnboarded = `-- name: SetUserOnboarded :exec
+UPDATE users
+SET access_state = 'onboarded',
+    role = CASE WHEN role = 'candidate' THEN 'member'::user_role ELSE role END
+WHERE id = $1
+`
+
+func (q *Queries) SetUserOnboarded(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, setUserOnboarded, id)
 	return err
 }
 

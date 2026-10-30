@@ -113,6 +113,10 @@ func FromContext(ctx context.Context) (Identity, bool) {
 	return id, ok
 }
 
+func NewContext(ctx context.Context, id Identity) context.Context {
+	return context.WithValue(ctx, ctxKey{}, id)
+}
+
 func writeError(w http.ResponseWriter, code int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)

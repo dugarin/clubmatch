@@ -26,8 +26,13 @@ func NewRouter(db *pgxpool.Pool, cfg config.Config) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
 	})
 	r.Post("/telegram/webhook", NewTelegramWebhookHandler(st, cfg.WebhookSecret))
-	r.Group(func(r chi.Router) {
+	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(auth.Middleware(st, cfg.TelegramBotToken, cfg.InitDataTTL))
+		ph := NewProfileHandler(db, st)
+		r.Post("/profiles", ph.Create)
+		r.Get("/profiles/me", ph.GetMe)
+		r.Patch("/profiles/me", ph.PatchMe)
+		r.Get("/tags/autocomplete", ph.Autocomplete)
 	})
 	return r
 }
