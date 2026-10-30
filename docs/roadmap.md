@@ -24,11 +24,11 @@
 
 | № | Артефакт | Содержание | Статус |
 |---|---|---|---|
-| 2.1 | Доменная модель (ER) | Анкета, Тег + алиасы, Оценка, Матч, Заявка, Приглашение, Журнал раскрытия контактов | [~] draft: [architecture/01-domain-model.md](architecture/01-domain-model.md), ждёт решения владельца |
-| 2.2 | ADR-1: стек и хранилище | Postgres как кандидат (полнотекстовый поиск рус./англ. из Р2) + ≥1 альтернатива | [~] proposed: [architecture/adr-001-storage-stack.md](architecture/adr-001-storage-stack.md), ждёт решения владельца |
-| 2.3 | ADR-2: интеграция Telegram | Bot API + валидация `initData` (NFR-7), доставка/повтор уведомлений (Р3, NFR-12) | [~] proposed: [architecture/adr-002-telegram-integration.md](architecture/adr-002-telegram-integration.md), ждёт решения владельца |
-| 2.4 | ADR-3: поиск и ранжирование | Реализация Р2: нормализация, алиасы тегов, приоритеты полей, пагинация | [~] proposed: [architecture/adr-003-search-ranking.md](architecture/adr-003-search-ranking.md) |
-| 2.5 | ADR-4: видимость полей и приватность | Server-side фильтрация полей (Р6, FR-14, AC-7), журнал раскрытия (Р8) | [~] proposed: [architecture/adr-004-visibility-privacy.md](architecture/adr-004-visibility-privacy.md) |
+| 2.1 | Доменная модель (ER) | Анкета, Тег + алиасы, Оценка, Матч, Заявка, Приглашение, Журнал раскрытия контактов | [x] accepted 2026-10-30: [architecture/01-domain-model.md](architecture/01-domain-model.md) |
+| 2.2 | ADR-1: стек и хранилище | Postgres как кандидат (полнотекстовый поиск рус./англ. из Р2) + ≥1 альтернатива | [x] accepted 2026-10-30: [architecture/adr-001-storage-stack.md](architecture/adr-001-storage-stack.md) (PG 16, Go, self-hosted) |
+| 2.3 | ADR-2: интеграция Telegram | Bot API + валидация `initData` (NFR-7), доставка/повтор уведомлений (Р3, NFR-12) | [x] accepted 2026-10-30: [architecture/adr-002-telegram-integration.md](architecture/adr-002-telegram-integration.md) |
+| 2.4 | ADR-3: поиск и ранжирование | Реализация Р2: нормализация, алиасы тегов, приоритеты полей, пагинация | [x] accepted 2026-10-30: [architecture/adr-003-search-ranking.md](architecture/adr-003-search-ranking.md) |
+| 2.5 | ADR-4: видимость полей и приватность | Server-side фильтрация полей (Р6, FR-14, AC-7), журнал раскрытия (Р8) | [x] accepted 2026-10-30: [architecture/adr-004-visibility-privacy.md](architecture/adr-004-visibility-privacy.md) |
 | 2.6 | C4: контекст + контейнеры | Mini App, backend, бот, БД | [x] draft: [architecture/02-c4.md](architecture/02-c4.md) |
 | 2.7 | Sequence-диаграммы | Матч (взаимное «интересно» → раскрытие контакта → недоставка уведомления); допуск заявки | [x] draft: [architecture/03-sequences.md](architecture/03-sequences.md) |
 | 2.8 | OpenAPI-контракт | Каждый эндпоинт трассируется к FR/UC; пересчёт матрицы покрытия | [x] draft: [architecture/04-openapi.yaml](architecture/04-openapi.yaml) + [04b-coverage-matrix.md](architecture/04b-coverage-matrix.md) (пробелов нет) |
@@ -39,9 +39,15 @@
 
 Каждый ADR — кандидат на решение с ≥2 альтернативами; решение принимает владелец.
 
+Критерий выхода фазы 2: все ADR приняты владельцем; покрытие FR эндпоинтами полное.
+**Выполнен 2026-10-30**: опросник [architecture/07-approval-form.md](architecture/07-approval-form.md) заполнен,
+ADR-001…004 и доменная модель — accepted; UC-1 дополнен шагом запуска бота (спека 1.1).
+Открыты только техпроверки T-1…T-3 (спайки) — перенесены в фазу 3.
+
 ## Фаза 3. Подготовка к разработке
 
 Декомпозиция на задачи — после 2.8 (эндпоинты и модель данных определены).
+Первые задачи фазы 3: спайки T-2 (двуязычный tsvector) и T-3 (корпус AC-5, формирует команда), спайк T-1 (`tg://user?id`) — вручную в Telegram.
 
 ## Блокеры и зависимости
 
@@ -49,4 +55,4 @@
 - Endpoint агента reviewer — повторить 1.4 после восстановления.
 - `tg://user?id` — `[непроверено]` до спайка 1.2 (выполняется владельцем/разработчиком в реальном Telegram).
 
-Статус: active (2026-10-29). См. [README](../README.md), [fix-plan](fix-plan.md).
+Статус: active (2026-10-30). Фаза 1 — выполнена; фаза 2 — выполнена (решения владельца приняты); далее фаза 3. См. [README](../README.md), [fix-plan](fix-plan.md).

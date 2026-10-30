@@ -106,7 +106,7 @@ paths:
         - { name: q, in: query, required: true, schema: { type: string, minLength: 1, maxLength: 256 } }
         - { name: location, in: query, schema: { type: string, maxLength: 64 } }
         - { name: meeting_format, in: query, schema: { type: string, enum: [online, offline] } }
-        - { name: cursor, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
       responses:
         '200':
           description: Страница ≤10 карточек; пустой массив — не ошибка (FR-10)
@@ -116,7 +116,8 @@ paths:
                 type: object
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/CardSearch' } }
-                  next_cursor: { type: string, nullable: true }
+                  page: { type: integer }
+                  has_more: { type: boolean }
                   filters_applied: { type: boolean }
   /matches:
     get:
