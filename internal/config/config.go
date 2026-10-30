@@ -8,14 +8,14 @@ import (
 )
 
 type Config struct {
-	HTTPAddr          string
-	DatabaseURL       string
-	TelegramBotToken  string
-	WebhookSecret     string
-	InitDataTTL       time.Duration
-	WorkerPoll        time.Duration
-	BackoffMinutes    []int
-	Env               string
+	HTTPAddr         string
+	DatabaseURL      string
+	TelegramBotToken string
+	WebhookSecret    string
+	InitDataTTL      time.Duration
+	WorkerPoll       time.Duration
+	BackoffMinutes   []int
+	Env              string
 }
 
 func getenv(key, def string) string {

@@ -5,11 +5,15 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/clubmatch/clubmatch/internal/auth"
+	"github.com/clubmatch/clubmatch/internal/config"
+	"github.com/clubmatch/clubmatch/internal/store"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func NewRouter(db *pgxpool.Pool) http.Handler {
+func NewRouter(db *pgxpool.Pool, cfg config.Config) http.Handler {
+	st := store.NewStore(db)
 	r := chi.NewRouter()
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -20,6 +24,10 @@ func NewRouter(db *pgxpool.Pool) http.Handler {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
+	})
+	r.Post("/telegram/webhook", NewTelegramWebhookHandler(st, cfg.WebhookSecret))
+	r.Group(func(r chi.Router) {
+		r.Use(auth.Middleware(st, cfg.TelegramBotToken, cfg.InitDataTTL))
 	})
 	return r
 }
