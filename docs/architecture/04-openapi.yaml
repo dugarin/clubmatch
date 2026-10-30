@@ -1,0 +1,255 @@
+openapi: 3.0.3
+info:
+  title: КлубМатч API
+  version: 0.1.0
+  description: >-
+    Draft-контракт (roadmap 2.8). Каждая операция трассируется к FR/UC
+    в extensions x-trace. Аутентификация — заголовок Authorization: tma <initData>
+    (валидация по ADR-002). Скрытые поля отсутствуют в ответе, а не null (ADR-004).
+servers:
+  - url: /api/v1
+tags: [profile, deck, search, match, moderation]
+
+paths:
+  /profiles:
+    post:
+      summary: Онбординг — создание анкеты
+      x-trace: [FR-1, FR-2, FR-13, FR-16, UC-1]
+      tags: [profile]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ProfileInput'
+                - type: object
+                  required: [consent_version]
+                  properties:
+                    consent_version: { type: string }
+      responses:
+        '201': { description: Анкета создана, content: { application/json: { schema: { $ref: '#/components/schemas/ProfileSelf' } } } }
+        '403': { description: Нет приглашения/одобрения или согласия (UC-1 E2/E3) }
+        '422': { description: Нарушены обязательные поля (UC-1 E1) }
+  /profiles/me:
+    get:
+      summary: Моя анкета
+      x-trace: [FR-3, UC-2]
+      tags: [profile]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ProfileSelf' } } } }
+    patch:
+      summary: Редактирование анкеты (инвариант обязательных полей)
+      x-trace: [FR-2, FR-3, UC-2]
+      tags: [profile]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProfileInput' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ProfileSelf' } } } }
+        '422': { description: Пустое обязательное поле (UC-2 E1) }
+    delete:
+      summary: Удаление анкеты
+      x-trace: [FR-17, UC-7]
+      tags: [profile]
+      responses:
+        '204': { description: Удалено (анкета, оценки, матчи; журналы сохраняются, ADR-004) }
+  /tags/autocomplete:
+    get:
+      summary: Автодополнение тегов
+      x-trace: [FR-4, UC-1]
+      tags: [profile]
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 1, maxLength: 64 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Tag' } } } } }
+  /deck:
+    get:
+      summary: Следующая порция карточек колоды
+      x-trace: [FR-5, FR-9, UC-3]
+      tags: [deck]
+      responses:
+        '200': { description: Карточки (видимость pre_match); пустой массив — исчерпание колоды (UC-3 E1), content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/CardPreMatch' } } } } }
+  /evaluations:
+    post:
+      summary: Оценка карточки (колода/поиск — одна сущность)
+      x-trace: [FR-6, FR-7, FR-12, UC-3, UC-5]
+      tags: [deck]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_id, value]
+              properties:
+                target_id: { type: string, format: uuid }
+                value: { type: string, enum: [interested, not_interested] }
+                source: { type: string, enum: [deck, search] }
+      responses:
+        '201':
+          description: Оценка зафиксирована; match=true — взаимность, контакт в данных
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  match: { type: boolean }
+                  card: { $ref: '#/components/schemas/CardAfterMatch' }
+  /search:
+    get:
+      summary: Поиск по запросу с фильтрами и пагинацией
+      x-trace: [FR-10, FR-11, NFR-2, UC-5]
+      tags: [search]
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 1, maxLength: 256 } }
+        - { name: location, in: query, schema: { type: string, maxLength: 64 } }
+        - { name: meeting_format, in: query, schema: { type: string, enum: [online, offline] } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Страница ≤10 карточек; пустой массив — не ошибка (FR-10)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/CardSearch' } }
+                  next_cursor: { type: string, nullable: true }
+                  filters_applied: { type: boolean }
+  /matches:
+    get:
+      summary: Раздел «Матчи» — контакты (повторный доступ)
+      x-trace: [FR-8, FR-17, UC-4]
+      tags: [match]
+      responses:
+        '200': { description: OK; удалённая вторая сторона — state=contact_unavailable, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/MatchItem' } } } } }
+  /applications:
+    post:
+      summary: Подача заявки в закрытое сообщество
+      x-trace: [FR-13, UC-1-E2, UC-6]
+      tags: [profile]
+      responses:
+        '201': { description: Заявка принята }
+        '409': { description: Активная заявка уже существует }
+  /moderation/applications:
+    get:
+      summary: Список заявок (модератор)
+      x-trace: [FR-15, UC-6]
+      tags: [moderation]
+      parameters:
+        - { name: state, in: query, schema: { type: string, enum: [pending, approved, rejected], default: pending } }
+      responses:
+        '200': { description: OK }
+        '403': { description: Не модератор }
+  /moderation/applications/{id}:approve:
+    post:
+      summary: Одобрить заявку
+      x-trace: [FR-13, FR-15, NFR-12, UC-6]
+      tags: [moderation]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: OK }
+        '409': { description: Решение уже принято }
+  /moderation/applications/{id}:reject:
+    post:
+      summary: Отклонить заявку
+      x-trace: [FR-15, NFR-12, UC-6-E1]
+      tags: [moderation]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: OK }
+        '409': { description: Решение уже принято }
+  /moderation/invites:
+    post:
+      summary: Создать ссылку-приглашение (одноразовую, без срока)
+      x-trace: [FR-13, FR-15, UC-6]
+      tags: [moderation]
+      responses:
+        '201': { description: OK, content: { application/json: { schema: { type: object, properties: { url: { type: string } } } } } }
+  /moderation/tags/{id}:revoke:
+    post:
+      summary: Отозвать тег (удаление из справочника и анкет)
+      x-trace: [FR-4, FR-15, NFR-12]
+      tags: [moderation]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: OK }
+  /telegram/webhook:
+    post:
+      summary: Webhook Telegram (только /start и служебные)
+      x-trace: [NFR-7, ADR-002]
+      responses:
+        '200': { description: OK }
+
+components:
+  parameters:
+    id: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+  schemas:
+    Tag:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        canonical: { type: string, minLength: 2, maxLength: 64 }
+    ProfileInput:
+      type: object
+      required: [first_name, skills, meeting_format]
+      properties:
+        first_name: { type: string, minLength: 2, maxLength: 64 }
+        last_name: { type: string, maxLength: 64 }
+        skills: { type: array, minItems: 1, maxItems: 30, items: { type: string } }
+        projects: { type: array, maxItems: 20, items: { type: string, minLength: 2, maxLength: 256 } }
+        professional_interests: { type: array, maxItems: 30, items: { type: string } }
+        personal_interests: { type: array, maxItems: 30, items: { type: string } }
+        location: { type: string, minLength: 2, maxLength: 64 }
+        meeting_format: { type: string, enum: [online, offline, any] }
+    ProfileSelf:
+      allOf:
+        - $ref: '#/components/schemas/ProfileInput'
+        - type: object
+          properties:
+            is_searchable: { type: boolean }
+            updated_at: { type: string, format: date-time }
+    CardPreMatch:
+      description: Видимость до матча (FR-14); first_name/last_name/avatar/contact отсутствуют
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        skills: { type: array, items: { type: string } }
+        projects: { type: array, items: { type: string } }
+        professional_interests: { type: array, items: { type: string } }
+        personal_interests: { type: array, items: { type: string } }
+        location: { type: string }
+        meeting_format: { type: string }
+    CardSearch:
+      allOf:
+        - $ref: '#/components/schemas/CardPreMatch'
+        - type: object
+          properties:
+            my_evaluation: { type: string, enum: [interested, not_interested], nullable: true }
+    CardAfterMatch:
+      allOf:
+        - $ref: '#/components/schemas/CardPreMatch'
+        - type: object
+          properties:
+            first_name: { type: string }
+            last_name: { type: string }
+            avatar_url: { type: string }
+            telegram_username: { type: string, nullable: true }
+            telegram_user_id: { type: integer, format: int64 }
+    MatchItem:
+      type: object
+      properties:
+        match_id: { type: string, format: uuid }
+        state: { type: string, enum: [active, contact_unavailable] }
+        card: { $ref: '#/components/schemas/CardAfterMatch' }
+        created_at: { type: string, format: date-time }
+  securitySchemes:
+    initData:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: 'tma <initData> — валидация HMAC по ADR-002'
+security:
+  - initData: []

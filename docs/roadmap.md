@@ -24,15 +24,17 @@
 
 | № | Артефакт | Содержание | Статус |
 |---|---|---|---|
-| 2.1 | Доменная модель (ER) | Анкета, Тег + алиасы, Оценка, Матч, Заявка, Приглашение, Журнал раскрытия контактов | [ ] |
-| 2.2 | ADR-1: стек и хранилище | Postgres как кандидат (полнотекстовый поиск рус./англ. из Р2) + ≥1 альтернатива | [ ] |
-| 2.3 | ADR-2: интеграция Telegram | Bot API + валидация `initData` (NFR-7), доставка/повтор уведомлений (Р3, NFR-12) | [ ] |
-| 2.4 | ADR-3: поиск и ранжирование | Реализация Р2: нормализация, алиасы тегов, приоритеты полей, пагинация | [ ] |
-| 2.5 | ADR-4: видимость полей и приватность | Server-side фильтрация полей (Р6, FR-14, AC-7), журнал раскрытия (Р8) | [ ] |
-| 2.6 | C4: контекст + контейнеры | Mini App, backend, бот, БД | [ ] |
-| 2.7 | Sequence-диаграммы | Матч (взаимное «интересно» → раскрытие контакта → недоставка уведомления); допуск заявки | [ ] |
-| 2.8 | OpenAPI-контракт | Каждый эндпоинт трассируется к FR/UC; пересчёт матрицы покрытия | [ ] |
-| 2.9 | Список рисков + observability | По handoff-формату architecture skill | [ ] |
+| 2.1 | Доменная модель (ER) | Анкета, Тег + алиасы, Оценка, Матч, Заявка, Приглашение, Журнал раскрытия контактов | [~] draft: [architecture/01-domain-model.md](architecture/01-domain-model.md), ждёт решения владельца |
+| 2.2 | ADR-1: стек и хранилище | Postgres как кандидат (полнотекстовый поиск рус./англ. из Р2) + ≥1 альтернатива | [~] proposed: [architecture/adr-001-storage-stack.md](architecture/adr-001-storage-stack.md), ждёт решения владельца |
+| 2.3 | ADR-2: интеграция Telegram | Bot API + валидация `initData` (NFR-7), доставка/повтор уведомлений (Р3, NFR-12) | [~] proposed: [architecture/adr-002-telegram-integration.md](architecture/adr-002-telegram-integration.md), ждёт решения владельца |
+| 2.4 | ADR-3: поиск и ранжирование | Реализация Р2: нормализация, алиасы тегов, приоритеты полей, пагинация | [~] proposed: [architecture/adr-003-search-ranking.md](architecture/adr-003-search-ranking.md) |
+| 2.5 | ADR-4: видимость полей и приватность | Server-side фильтрация полей (Р6, FR-14, AC-7), журнал раскрытия (Р8) | [~] proposed: [architecture/adr-004-visibility-privacy.md](architecture/adr-004-visibility-privacy.md) |
+| 2.6 | C4: контекст + контейнеры | Mini App, backend, бот, БД | [x] draft: [architecture/02-c4.md](architecture/02-c4.md) |
+| 2.7 | Sequence-диаграммы | Матч (взаимное «интересно» → раскрытие контакта → недоставка уведомления); допуск заявки | [x] draft: [architecture/03-sequences.md](architecture/03-sequences.md) |
+| 2.8 | OpenAPI-контракт | Каждый эндпоинт трассируется к FR/UC; пересчёт матрицы покрытия | [x] draft: [architecture/04-openapi.yaml](architecture/04-openapi.yaml) + [04b-coverage-matrix.md](architecture/04b-coverage-matrix.md) (пробелов нет) |
+| 2.9 | Список рисков + observability | По handoff-формату architecture skill | [x] draft: [architecture/05-risks-observability.md](architecture/05-risks-observability.md) |
+
+Свод открытых вопросов фазы 2 (решения принимает владелец): [architecture/06-open-questions.md](architecture/06-open-questions.md).
 
 Каждый ADR — кандидат на решение с ≥2 альтернативами; решение принимает владелец.
 
