@@ -33,6 +33,18 @@ func NewRouter(db *pgxpool.Pool, cfg config.Config) http.Handler {
 		r.Get("/profiles/me", ph.GetMe)
 		r.Patch("/profiles/me", ph.PatchMe)
 		r.Get("/tags/autocomplete", ph.Autocomplete)
+		ah := NewApplicationHandler(db, st)
+		r.Post("/applications", ah.Submit)
+		r.Get("/applications/me", ah.GetMe)
+		mh := NewModerationHandler(db, st, cfg.BotUsername, cfg.MiniAppName)
+		r.Route("/moderation", func(r chi.Router) {
+			r.Use(RequireModerator(st))
+			r.Get("/applications", mh.ListApplications)
+			r.Post("/applications/{id}/approve", mh.Approve)
+			r.Post("/applications/{id}/reject", mh.Reject)
+			r.Post("/invites", mh.CreateInvite)
+			r.Post("/tags/{id}/revoke", mh.RevokeTag)
+		})
 	})
 	return r
 }

@@ -25,6 +25,15 @@ func (q *Queries) DeleteProfileTagsByKind(ctx context.Context, arg DeleteProfile
 	return err
 }
 
+const deleteProfileTagsByTagID = `-- name: DeleteProfileTagsByTagID :exec
+DELETE FROM profile_tag WHERE tag_id = $1
+`
+
+func (q *Queries) DeleteProfileTagsByTagID(ctx context.Context, tagID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteProfileTagsByTagID, tagID)
+	return err
+}
+
 const deleteProjectsByProfileID = `-- name: DeleteProjectsByProfileID :exec
 DELETE FROM project WHERE profile_id = $1
 `
@@ -133,6 +142,30 @@ func (q *Queries) InsertProject(ctx context.Context, arg InsertProjectParams) er
 	return err
 }
 
+const listProfileIDsByTag = `-- name: ListProfileIDsByTag :many
+SELECT DISTINCT profile_id FROM profile_tag WHERE tag_id = $1
+`
+
+func (q *Queries) ListProfileIDsByTag(ctx context.Context, tagID pgtype.UUID) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, listProfileIDsByTag, tagID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var profile_id pgtype.UUID
+		if err := rows.Scan(&profile_id); err != nil {
+			return nil, err
+		}
+		items = append(items, profile_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listProfileTagCanonicals = `-- name: ListProfileTagCanonicals :many
 SELECT t.canonical
 FROM profile_tag pt
@@ -159,6 +192,40 @@ func (q *Queries) ListProfileTagCanonicals(ctx context.Context, arg ListProfileT
 			return nil, err
 		}
 		items = append(items, canonical)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProfilesWithLastSkillTag = `-- name: ListProfilesWithLastSkillTag :many
+SELECT pt.profile_id
+FROM profile_tag pt
+WHERE pt.tag_id = $1
+  AND pt.kind = 'skill'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM profile_tag pt2
+      WHERE pt2.profile_id = pt.profile_id
+        AND pt2.kind = 'skill'
+        AND pt2.tag_id <> pt.tag_id
+  )
+`
+
+func (q *Queries) ListProfilesWithLastSkillTag(ctx context.Context, tagID pgtype.UUID) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, listProfilesWithLastSkillTag, tagID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var profile_id pgtype.UUID
+		if err := rows.Scan(&profile_id); err != nil {
+			return nil, err
+		}
+		items = append(items, profile_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -213,6 +280,20 @@ WHERE p.user_id = $1
 
 func (q *Queries) RebuildProfileFTS(ctx context.Context, userID pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, rebuildProfileFTS, userID)
+	return err
+}
+
+const setProfileSearchable = `-- name: SetProfileSearchable :exec
+UPDATE profile SET is_searchable = $2 WHERE user_id = $1
+`
+
+type SetProfileSearchableParams struct {
+	UserID       pgtype.UUID
+	IsSearchable bool
+}
+
+func (q *Queries) SetProfileSearchable(ctx context.Context, arg SetProfileSearchableParams) error {
+	_, err := q.db.Exec(ctx, setProfileSearchable, arg.UserID, arg.IsSearchable)
 	return err
 }
 

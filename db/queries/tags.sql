@@ -16,6 +16,13 @@ LIMIT 1;
 -- name: GetTagByNormalized :one
 SELECT * FROM tag WHERE normalized = $1;
 
+-- name: GetTagByID :one
+SELECT * FROM tag WHERE id = $1;
+
+-- name: RevokeTag :execrows
+UPDATE tag SET status = 'revoked'
+WHERE id = $1 AND status = 'active';
+
 -- name: CreateTag :one
 INSERT INTO tag (canonical, normalized, created_by)
 VALUES ($1, $2, $3)

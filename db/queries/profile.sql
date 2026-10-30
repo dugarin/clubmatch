@@ -39,6 +39,28 @@ ORDER BY t.canonical;
 -- name: DeleteProjectsByProfileID :exec
 DELETE FROM project WHERE profile_id = $1;
 
+-- name: ListProfileIDsByTag :many
+SELECT DISTINCT profile_id FROM profile_tag WHERE tag_id = $1;
+
+-- name: ListProfilesWithLastSkillTag :many
+SELECT pt.profile_id
+FROM profile_tag pt
+WHERE pt.tag_id = $1
+  AND pt.kind = 'skill'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM profile_tag pt2
+      WHERE pt2.profile_id = pt.profile_id
+        AND pt2.kind = 'skill'
+        AND pt2.tag_id <> pt.tag_id
+  );
+
+-- name: DeleteProfileTagsByTagID :exec
+DELETE FROM profile_tag WHERE tag_id = $1;
+
+-- name: SetProfileSearchable :exec
+UPDATE profile SET is_searchable = $2 WHERE user_id = $1;
+
 -- name: InsertProject :exec
 INSERT INTO project (profile_id, text, position) VALUES ($1, $2, $3);
 

@@ -12,6 +12,8 @@ type Config struct {
 	DatabaseURL      string
 	TelegramBotToken string
 	WebhookSecret    string
+	BotUsername      string
+	MiniAppName      string
 	InitDataTTL      time.Duration
 	WorkerPoll       time.Duration
 	BackoffMinutes   []int
@@ -39,6 +41,8 @@ func Load() (Config, error) {
 		DatabaseURL:      os.Getenv("DATABASE_URL"),
 		TelegramBotToken: os.Getenv("TELEGRAM_BOT_TOKEN"),
 		WebhookSecret:    os.Getenv("TELEGRAM_WEBHOOK_SECRET"),
+		BotUsername:      os.Getenv("TELEGRAM_BOT_USERNAME"),
+		MiniAppName:      os.Getenv("TELEGRAM_MINIAPP_NAME"),
 		InitDataTTL:      time.Duration(ttl) * time.Hour,
 		WorkerPoll:       time.Duration(poll) * time.Second,
 		BackoffMinutes:   []int{1, 5, 15, 60},

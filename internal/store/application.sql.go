@@ -31,6 +31,67 @@ func (q *Queries) CreateApplication(ctx context.Context, candidateID pgtype.UUID
 	return i, err
 }
 
+const decideApplication = `-- name: DecideApplication :execrows
+UPDATE application
+SET state = $2, decided_by = $3, decided_at = now()
+WHERE id = $1 AND state = 'pending'
+`
+
+type DecideApplicationParams struct {
+	ID        pgtype.UUID
+	State     ApplicationState
+	DecidedBy pgtype.UUID
+}
+
+func (q *Queries) DecideApplication(ctx context.Context, arg DecideApplicationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, decideApplication, arg.ID, arg.State, arg.DecidedBy)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const getApplicationByID = `-- name: GetApplicationByID :one
+SELECT id, candidate_id, state, decided_by, decided_at, created_at
+FROM application
+WHERE id = $1
+`
+
+func (q *Queries) GetApplicationByID(ctx context.Context, id pgtype.UUID) (Application, error) {
+	row := q.db.QueryRow(ctx, getApplicationByID, id)
+	var i Application
+	err := row.Scan(
+		&i.ID,
+		&i.CandidateID,
+		&i.State,
+		&i.DecidedBy,
+		&i.DecidedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getLatestApplicationByCandidate = `-- name: GetLatestApplicationByCandidate :one
+SELECT id, candidate_id, state, decided_by, decided_at, created_at
+FROM application
+WHERE candidate_id = $1
+ORDER BY created_at DESC LIMIT 1
+`
+
+func (q *Queries) GetLatestApplicationByCandidate(ctx context.Context, candidateID pgtype.UUID) (Application, error) {
+	row := q.db.QueryRow(ctx, getLatestApplicationByCandidate, candidateID)
+	var i Application
+	err := row.Scan(
+		&i.ID,
+		&i.CandidateID,
+		&i.State,
+		&i.DecidedBy,
+		&i.DecidedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getPendingApplicationByCandidate = `-- name: GetPendingApplicationByCandidate :one
 SELECT id, candidate_id, state, decided_by, decided_at, created_at
 FROM application
@@ -50,4 +111,53 @@ func (q *Queries) GetPendingApplicationByCandidate(ctx context.Context, candidat
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const listApplicationsByState = `-- name: ListApplicationsByState :many
+SELECT a.id, a.candidate_id, a.state, a.decided_by, a.decided_at, a.created_at,
+       u.telegram_user_id, u.telegram_username
+FROM application a
+JOIN users u ON u.id = a.candidate_id
+WHERE a.state = $1
+ORDER BY a.created_at ASC
+`
+
+type ListApplicationsByStateRow struct {
+	ID               pgtype.UUID
+	CandidateID      pgtype.UUID
+	State            ApplicationState
+	DecidedBy        pgtype.UUID
+	DecidedAt        pgtype.Timestamptz
+	CreatedAt        pgtype.Timestamptz
+	TelegramUserID   int64
+	TelegramUsername *string
+}
+
+func (q *Queries) ListApplicationsByState(ctx context.Context, state ApplicationState) ([]ListApplicationsByStateRow, error) {
+	rows, err := q.db.Query(ctx, listApplicationsByState, state)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListApplicationsByStateRow
+	for rows.Next() {
+		var i ListApplicationsByStateRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CandidateID,
+			&i.State,
+			&i.DecidedBy,
+			&i.DecidedAt,
+			&i.CreatedAt,
+			&i.TelegramUserID,
+			&i.TelegramUsername,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

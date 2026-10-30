@@ -134,6 +134,23 @@ func (q *Queries) FindTagByNormalizedOrLexemes(ctx context.Context, arg FindTagB
 	return i, err
 }
 
+const getTagByID = `-- name: GetTagByID :one
+SELECT id, canonical, normalized, status, created_by FROM tag WHERE id = $1
+`
+
+func (q *Queries) GetTagByID(ctx context.Context, id pgtype.UUID) (Tag, error) {
+	row := q.db.QueryRow(ctx, getTagByID, id)
+	var i Tag
+	err := row.Scan(
+		&i.ID,
+		&i.Canonical,
+		&i.Normalized,
+		&i.Status,
+		&i.CreatedBy,
+	)
+	return i, err
+}
+
 const getTagByNormalized = `-- name: GetTagByNormalized :one
 SELECT id, canonical, normalized, status, created_by FROM tag WHERE normalized = $1
 `
@@ -160,4 +177,17 @@ func (q *Queries) LexemesOfText(ctx context.Context, dollar_1 string) ([]string,
 	var lexemes []string
 	err := row.Scan(&lexemes)
 	return lexemes, err
+}
+
+const revokeTag = `-- name: RevokeTag :execrows
+UPDATE tag SET status = 'revoked'
+WHERE id = $1 AND status = 'active'
+`
+
+func (q *Queries) RevokeTag(ctx context.Context, id pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeTag, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

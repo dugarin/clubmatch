@@ -16,3 +16,11 @@ UPDATE users
 SET access_state = 'onboarded',
     role = CASE WHEN role = 'candidate' THEN 'member'::user_role ELSE role END
 WHERE id = $1;
+
+-- name: ApproveUserAccess :exec
+UPDATE users SET access_state = 'approved'
+WHERE id = $1 AND access_state IN ('none', 'rejected', 'invited');
+
+-- name: RejectUserAccess :exec
+UPDATE users SET access_state = 'rejected'
+WHERE id = $1 AND access_state = 'none';

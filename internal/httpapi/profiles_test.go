@@ -33,6 +33,8 @@ type testEnv struct {
 	pool *pgxpool.Pool
 	st   *store.Store
 	h    *ProfileHandler
+	ah   *ApplicationHandler
+	mh   *ModerationHandler
 }
 
 func newTestEnv(t *testing.T) *testEnv {
@@ -47,7 +49,13 @@ func newTestEnv(t *testing.T) *testEnv {
 	}
 	t.Cleanup(pool.Close)
 	st := store.NewStore(pool)
-	return &testEnv{pool: pool, st: st, h: NewProfileHandler(pool, st)}
+	return &testEnv{
+		pool: pool,
+		st:   st,
+		h:    NewProfileHandler(pool, st),
+		ah:   NewApplicationHandler(pool, st),
+		mh:   NewModerationHandler(pool, st, "testbot", "testapp"),
+	}
 }
 
 func (e *testEnv) createUser(t *testing.T, accessState string) store.User {

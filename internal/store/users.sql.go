@@ -11,6 +11,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const approveUserAccess = `-- name: ApproveUserAccess :exec
+UPDATE users SET access_state = 'approved'
+WHERE id = $1 AND access_state IN ('none', 'rejected', 'invited')
+`
+
+func (q *Queries) ApproveUserAccess(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, approveUserAccess, id)
+	return err
+}
+
 const getUserByTelegramID = `-- name: GetUserByTelegramID :one
 SELECT id, telegram_user_id, telegram_username, role, access_state, created_at, deleted_at, chat_id FROM users WHERE telegram_user_id = $1 AND deleted_at IS NULL
 `
@@ -29,6 +39,16 @@ func (q *Queries) GetUserByTelegramID(ctx context.Context, telegramUserID int64)
 		&i.ChatID,
 	)
 	return i, err
+}
+
+const rejectUserAccess = `-- name: RejectUserAccess :exec
+UPDATE users SET access_state = 'rejected'
+WHERE id = $1 AND access_state = 'none'
+`
+
+func (q *Queries) RejectUserAccess(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, rejectUserAccess, id)
+	return err
 }
 
 const setUserChatID = `-- name: SetUserChatID :exec
