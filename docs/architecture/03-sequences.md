@@ -14,10 +14,11 @@ sequenceDiagram
     participant B as Участник B
 
     A->>API: POST /evaluations {target: B, value: interested}
-    API->>DB: TX: upsert Evaluation(A→B); SELECT Evaluation(B→A)
+    API->>DB: TX: upsert Evaluation(A→B); insert EvaluationHistory (каждая оценка и смена, Q-5.1); SELECT Evaluation(B→A)
     alt B уже оценил A «интересно»
         DB-->>API: встречная оценка есть
         API->>DB: TX: insert Match; insert ContactDisclosureJournal ×2; insert outbox ×2 (notify_match)
+        Note over API,DB: Гонка одновременных взаимных оценок: unique (user_low, user_high) → у проигравшей TX unique violation → повторное чтение Match, ответ «матч существует» (F13)
         API-->>A: 201 {match: true, card: <видимость after_match>}
         Note over A: Контакт B доступен сразу в ответе и в «Матчах» (FR-8)
     else нет встречной оценки

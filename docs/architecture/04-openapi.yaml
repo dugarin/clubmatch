@@ -27,9 +27,11 @@ paths:
                   required: [consent_version]
                   properties:
                     consent_version: { type: string }
+                    invite_token: { type: string, description: 'Токен ссылки-приглашения из start-параметра Mini App (FR-13, ADR-002 п.2a)' }
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '201': { description: Анкета создана, content: { application/json: { schema: { $ref: '#/components/schemas/ProfileSelf' } } } }
-        '403': { description: Нет приглашения/одобрения или согласия (UC-1 E2/E3) }
+        '403': { description: Нет приглашения/одобрения или согласия (UC-1 E2/E3); токен приглашения недействителен или погашен (FR-13) }
         '422': { description: Нарушены обязательные поля (UC-1 E1) }
   /profiles/me:
     get:
@@ -37,6 +39,7 @@ paths:
       x-trace: [FR-3, UC-2]
       tags: [profile]
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ProfileSelf' } } } }
     patch:
       summary: Редактирование анкеты (инвариант обязательных полей)
@@ -47,6 +50,7 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/ProfileInput' }
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ProfileSelf' } } } }
         '422': { description: Пустое обязательное поле (UC-2 E1) }
     delete:
@@ -54,6 +58,7 @@ paths:
       x-trace: [FR-17, UC-7]
       tags: [profile]
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '204': { description: Удалено (анкета, оценки, матчи; журналы сохраняются, ADR-004) }
   /tags/autocomplete:
     get:
@@ -63,6 +68,7 @@ paths:
       parameters:
         - { name: q, in: query, required: true, schema: { type: string, minLength: 1, maxLength: 64 } }
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Tag' } } } } }
   /deck:
     get:
@@ -70,6 +76,7 @@ paths:
       x-trace: [FR-5, FR-9, UC-3]
       tags: [deck]
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '200': { description: Карточки (видимость pre_match); пустой массив — исчерпание колоды (UC-3 E1), content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/CardPreMatch' } } } } }
   /evaluations:
     post:
@@ -88,6 +95,7 @@ paths:
                 value: { type: string, enum: [interested, not_interested] }
                 source: { type: string, enum: [deck, search] }
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '201':
           description: Оценка зафиксирована; match=true — взаимность, контакт в данных
           content:
@@ -108,6 +116,7 @@ paths:
         - { name: meeting_format, in: query, schema: { type: string, enum: [online, offline] } }
         - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '200':
           description: Страница ≤10 карточек; пустой массив — не ошибка (FR-10)
           content:
@@ -125,6 +134,7 @@ paths:
       x-trace: [FR-8, FR-17, UC-4]
       tags: [match]
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '200': { description: OK; удалённая вторая сторона — state=contact_unavailable, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/MatchItem' } } } } }
   /applications:
     post:
@@ -132,8 +142,9 @@ paths:
       x-trace: [FR-13, UC-1-E2, UC-6]
       tags: [profile]
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '201': { description: Заявка принята }
-        '409': { description: Активная заявка уже существует }
+        '409': { description: 'Активная заявка уже существует [предположение: одна pending-заявка на кандидата — ограничение дизайна, не из требований]' }
   /moderation/applications:
     get:
       summary: Список заявок (модератор)
@@ -142,24 +153,29 @@ paths:
       parameters:
         - { name: state, in: query, schema: { type: string, enum: [pending, approved, rejected], default: pending } }
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '200': { description: OK }
-        '403': { description: Не модератор }
-  /moderation/applications/{id}:approve:
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /moderation/applications/{id}/approve:
     post:
       summary: Одобрить заявку
       x-trace: [FR-13, FR-15, NFR-12, UC-6]
       tags: [moderation]
       parameters: [{ $ref: '#/components/parameters/id' }]
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '200': { description: OK }
         '409': { description: Решение уже принято }
-  /moderation/applications/{id}:reject:
+  /moderation/applications/{id}/reject:
     post:
       summary: Отклонить заявку
       x-trace: [FR-15, NFR-12, UC-6-E1]
       tags: [moderation]
       parameters: [{ $ref: '#/components/parameters/id' }]
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '200': { description: OK }
         '409': { description: Решение уже принято }
   /moderation/invites:
@@ -168,23 +184,35 @@ paths:
       x-trace: [FR-13, FR-15, UC-6]
       tags: [moderation]
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '201': { description: OK, content: { application/json: { schema: { type: object, properties: { url: { type: string } } } } } }
-  /moderation/tags/{id}:revoke:
+  /moderation/tags/{id}/revoke:
     post:
       summary: Отозвать тег (удаление из справочника и анкет)
       x-trace: [FR-4, FR-15, NFR-12]
       tags: [moderation]
       parameters: [{ $ref: '#/components/parameters/id' }]
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '200': { description: OK }
   /telegram/webhook:
     post:
       summary: Webhook Telegram (только /start и служебные)
+      description: Аутентификация — заголовок X-Telegram-Bot-Api-Secret-Token (secret_token из setWebhook, ADR-002 п.5); без валидного секрета — 401. initData здесь не применяется.
+      security: []
       x-trace: [NFR-7, ADR-002]
       responses:
         '200': { description: OK }
+        '401': { description: Невалидный secret_token }
 
 components:
+  responses:
+    Unauthorized:
+      description: Невалидный или просроченный initData (NFR-7, AC-6)
+    Forbidden:
+      description: Недостаточно прав — требуется роль модератора (NFR-9, FR-15)
   parameters:
     id: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
   schemas:
@@ -199,10 +227,10 @@ components:
       properties:
         first_name: { type: string, minLength: 2, maxLength: 64 }
         last_name: { type: string, maxLength: 64 }
-        skills: { type: array, minItems: 1, maxItems: 30, items: { type: string } }
-        projects: { type: array, maxItems: 20, items: { type: string, minLength: 2, maxLength: 256 } }
-        professional_interests: { type: array, maxItems: 30, items: { type: string } }
-        personal_interests: { type: array, maxItems: 30, items: { type: string } }
+        skills: { type: array, minItems: 1, maxItems: 30, uniqueItems: true, items: { type: string, minLength: 2, maxLength: 64 } }
+        projects: { type: array, maxItems: 20, uniqueItems: true, items: { type: string, minLength: 2, maxLength: 256 } }
+        professional_interests: { type: array, maxItems: 30, uniqueItems: true, items: { type: string, minLength: 2, maxLength: 64 } }
+        personal_interests: { type: array, maxItems: 30, uniqueItems: true, items: { type: string, minLength: 2, maxLength: 64 } }
         location: { type: string, minLength: 2, maxLength: 64 }
         meeting_format: { type: string, enum: [online, offline, any] }
     ProfileSelf:
@@ -211,6 +239,7 @@ components:
         - type: object
           properties:
             is_searchable: { type: boolean }
+            bot_linked: { type: boolean, description: 'Связка с ботом выполнена (для баннера «включить уведомления», ADR-002)' }
             updated_at: { type: string, format: date-time }
     CardPreMatch:
       description: Видимость до матча (FR-14); first_name/last_name/avatar/contact отсутствуют
@@ -244,7 +273,11 @@ components:
       properties:
         match_id: { type: string, format: uuid }
         state: { type: string, enum: [active, contact_unavailable] }
-        card: { $ref: '#/components/schemas/CardAfterMatch' }
+        card:
+          nullable: true
+          description: 'При state=contact_unavailable — null: анкета второй стороны удалена, контакт не отдаётся (FR-17, ADR-004 состояние matched_deleted)'
+          allOf:
+            - $ref: '#/components/schemas/CardAfterMatch'
         created_at: { type: string, format: date-time }
   securitySchemes:
     initData:

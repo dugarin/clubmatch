@@ -14,11 +14,11 @@ Roadmap 2.8 (пересчёт покрытия). Контракт: [04-openapi.y
 | FR-10 | GET /search | UC-5 |
 | FR-11 | GET /search (location, meeting_format) | UC-5 |
 | FR-12 | POST /evaluations (`source`); GET /search (метка) | UC-5 |
-| FR-13 | POST /applications; POST /moderation/invites; approve | UC-1, UC-6 |
+| FR-13 | POST /applications; POST /moderation/invites; approve; POST /profiles (`invite_token` — погашение ссылки-приглашения, ревью F2) | UC-1, UC-6 |
 | FR-14 | Схемы CardPreMatch/CardAfterMatch (поля отсутствуют, не null) | все |
 | FR-15 | /moderation/* | UC-6 |
 | FR-16 | POST /profiles (`consent_version`) | UC-1 |
-| FR-17 | DELETE /profiles/me; GET /matches (`contact_unavailable`) | UC-7 |
+| FR-17 | DELETE /profiles/me; GET /matches (`contact_unavailable` → `card: null`, контакт не отдаётся, ревью F4) | UC-7 |
 
 Пробелов нет: все FR-1…FR-17 имеют эндпоинт или выражены схемой контракта. NFR, выраженные вне контракта: NFR-1…NFR-3 (производительность — observability), NFR-6 (доступность), NFR-10 (журналы/хранение), NFR-11 (клиент), NFR-13 (язык лейблов).
 

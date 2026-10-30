@@ -1,6 +1,6 @@
 # Архитектура 01. Доменная модель (ER)
 
-Roadmap 2.1. Вход: spec 1.0 ([README](../../README.md), цепочка 01–07).
+Roadmap 2.1. Вход: spec 1.1 ([README](../../README.md), цепочка 01–07).
 Статус: accepted (2026-10-30, опросник [07](07-approval-form.md): Q-5.1…Q-5.4). Суждения помечены `[предположение]`, `[умозаключение]`.
 
 ## Сущности
@@ -18,7 +18,7 @@ Telegram-аккаунт, прошедший аутентификацию чер�
 | `telegram_user_id` | bigint, unique | Идентификатор Telegram; часть контакта при скрытом username | FR-8, глоссарий «Telegram-контакт» |
 | `telegram_username` | text, null | Может отсутствовать/меняться; хранить как снапшот `[предположение]` | FR-8 |
 | `role` | enum: `candidate`, `member`, `moderator` | Кандидат → Участник после онбординга; модератор — конфигурация владельцем | FR-13, FR-15, глоссарий |
-| `access_state` | enum: `invited`, `approved`, `onboarded`, `rejected` | Допуск до онбординга (приглашение или одобрение) | FR-13, NFR-9 |
+| `access_state` | enum: `none`, `invited`, `approved`, `onboarded`, `rejected` | Допуск до онбординга (приглашение или одобрение). `none` — начальное состояние (первый вход, нет ни приглашения, ни заявки); переход `rejected` → повторная подача заявки разрешена, при одобрении новой заявки состояние → `approved` (Q21, ревью F14) | FR-13, NFR-9 |
 | `created_at`, `deleted_at` | timestamptz | `deleted_at` — мягкое удаление при удалении анкеты | FR-17 |
 
 ### Profile (Анкета)
@@ -153,7 +153,8 @@ Telegram-аккаунт, прошедший аутентификацию чер�
 | `id` | uuid | PK | — |
 | `moderator_id` | FK User | — | FR-15 |
 | `action` | enum: `application_approved`, `application_rejected`, `invite_created`, `tag_revoked` | — | FR-4, FR-15 |
-| `target` | text/uuid | ID заявки/приглашения/тега `[предположение]` | — |
+| `target_type` | enum: `application`, `invite`, `tag` | Тип объекта решения (ревью F17) | — |
+| `target_id` | uuid | ID заявки/приглашения/тега | — |
 | `created_at` | timestamptz | Хранение 1 год | NFR-10 |
 
 ## ER-диаграмма (Mermaid)
@@ -213,4 +214,4 @@ erDiagram
 | low | Изменение username в Telegram делает снапшот устаревшим | обновление при каждом входе через `initData` `[предположение]` |
 | low | Удаление User ломает FK в журналах с годовым хранением | денормализованный снапшот `telegram_user_id` в журналах |
 
-Статус: draft (2026-10-30). См. [roadmap](../roadmap.md) фаза 2.
+Статус: accepted (2026-10-30). См. [roadmap](../roadmap.md) фаза 2.
