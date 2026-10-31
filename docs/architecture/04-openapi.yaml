@@ -128,6 +128,7 @@ paths:
                   page: { type: integer }
                   has_more: { type: boolean }
                   filters_applied: { type: boolean }
+        '422': { description: 'Ни один терм запроса не разрешился в тег — MVP tag-only поиск (spec 1.2)' }
   /matches:
     get:
       summary: Раздел «Матчи» — контакты (повторный доступ)

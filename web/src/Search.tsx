@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, Card } from './api';
+import { api, ApiError, Card } from './api';
 import { CardView } from './CardView';
 
 export function Search() {
@@ -14,12 +14,23 @@ export function Search() {
   const [notice, setNotice] = useState('');
 
   const run = async (p: number) => {
-    const res = await api.search(q, location, format, p);
-    setItems(p === 1 ? res.items : [...items, ...res.items]);
-    setPage(p);
-    setHasMore(res.has_more);
-    setSearched(true);
-    setFiltersApplied(res.filters_applied);
+    try {
+      const res = await api.search(q, location, format, p);
+      setItems(p === 1 ? res.items : [...items, ...res.items]);
+      setPage(p);
+      setHasMore(res.has_more);
+      setSearched(true);
+      setFiltersApplied(res.filters_applied);
+      setNotice('');
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 422) {
+        setItems([]);
+        setSearched(true);
+        setNotice('Unknown tag. Search works by exact keywords (tags), e.g. "Kafka".');
+      } else {
+        throw e;
+      }
+    }
   };
 
   const rate = async (c: Card, value: string) => {

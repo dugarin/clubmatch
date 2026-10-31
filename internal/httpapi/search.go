@@ -72,14 +72,23 @@ func (h *SearchHandler) Get(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	rows, err := h.st.SearchProfiles(ctx, store.SearchProfilesParams{
+	tagIDs, err := h.st.ResolveTagIDsByLexemes(ctx, lexemes)
+	if err != nil {
+		slog.Error("search: resolve tags", "err", err)
+		writeErr(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if len(tagIDs) == 0 {
+		writeErr(w, http.StatusUnprocessableEntity, "unknown tag", "q")
+		return
+	}
+	rows, err := h.st.SearchProfilesByTags(ctx, store.SearchProfilesByTagsParams{
 		EvaluatorID:   u.ID,
 		LocationNorm:  locationNorm,
 		MeetingFormat: meetingFormat,
 		OffsetCount:   int32((page - 1) * searchPageSize),
 		LimitCount:    searchPageSize + 1,
-		QueryNorm:     profile.Normalize(q),
-		Lexemes:       lexemes,
+		TagIds:        tagIDs,
 	})
 	if err != nil {
 		slog.Error("search: query", "err", err)

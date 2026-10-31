@@ -11,100 +11,111 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const searchProfiles = `-- name: SearchProfiles :many
-WITH q AS (
-    SELECT websearch_to_tsquery('russian', $6::text) AS tsq
+const resolveTagIDsByLexemes = `-- name: ResolveTagIDsByLexemes :many
+SELECT DISTINCT t.id
+FROM tag t
+WHERE t.status = 'active'
+  AND EXISTS (
+      SELECT 1
+      FROM tag_alias a
+      WHERE a.tag_id = t.id
+        AND cardinality(a.lexemes) > 0
+        AND a.lexemes <@ $1::text[]
+  )
+`
+
+func (q *Queries) ResolveTagIDsByLexemes(ctx context.Context, dollar_1 []string) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, resolveTagIDsByLexemes, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchProfilesByTags = `-- name: SearchProfilesByTags :many
+WITH matched AS (
+    SELECT unnest($6::uuid[]) AS tag_id
 ),
-tag_matches AS (
+ranked AS (
     SELECT pt.profile_id,
            min(CASE pt.kind
                    WHEN 'skill' THEN 0
                    WHEN 'professional_interest' THEN 1
                    ELSE 2
-               END)::int AS tag_group
+               END) FILTER (WHERE pt.tag_id IN (SELECT tag_id FROM matched))::int AS tag_group
     FROM profile_tag pt
-    JOIN tag t ON t.id = pt.tag_id AND t.status = 'active'
-    WHERE EXISTS (
-        SELECT 1
-        FROM tag_alias a
-        WHERE a.tag_id = t.id
-          AND cardinality(a.lexemes) > 0
-          AND a.lexemes <@ $7::text[]
-    )
     GROUP BY pt.profile_id
-),
-fts_matches AS (
-    SELECT p.user_id,
-           ts_rank_cd('{0.1,0.2,0.4,1.0}', p.fts_doc, q.tsq) AS rank
-    FROM profile p, q
-    WHERE p.fts_doc @@ q.tsq
+    HAVING count(DISTINCT pt.tag_id) FILTER (WHERE pt.tag_id IN (SELECT tag_id FROM matched))
+           = cardinality($6::uuid[])
 )
 SELECT p.user_id, p.location, p.meeting_format,
-       tm.tag_group,
-       fm.rank,
+       r.tag_group,
        COALESCE((SELECT e.value::text FROM evaluation e
         WHERE e.evaluator_id = $1 AND e.target_id = p.user_id), '') AS my_evaluation
-FROM profile p
+FROM ranked r
+JOIN profile p ON p.user_id = r.profile_id
 JOIN users u ON u.id = p.user_id
-LEFT JOIN tag_matches tm ON tm.profile_id = p.user_id
-LEFT JOIN fts_matches fm ON fm.user_id = p.user_id
-WHERE (tm.profile_id IS NOT NULL OR fm.user_id IS NOT NULL)
-  AND p.user_id <> $1
+WHERE p.user_id <> $1
   AND p.is_searchable
   AND u.deleted_at IS NULL
   AND ($2::text IS NULL OR p.location_norm = $2::text)
   AND ($3::meeting_format IS NULL
        OR p.meeting_format = $3::meeting_format
        OR p.meeting_format = 'any')
-ORDER BY (tm.tag_group IS NOT NULL) DESC,
-         tm.tag_group,
-         fm.rank DESC NULLS LAST,
-         p.user_id
+ORDER BY r.tag_group, p.user_id
 LIMIT $5 OFFSET $4
 `
 
-type SearchProfilesParams struct {
+type SearchProfilesByTagsParams struct {
 	EvaluatorID   pgtype.UUID
 	LocationNorm  *string
 	MeetingFormat *MeetingFormat
 	OffsetCount   int32
 	LimitCount    int32
-	QueryNorm     string
-	Lexemes       []string
+	TagIds        []pgtype.UUID
 }
 
-type SearchProfilesRow struct {
+type SearchProfilesByTagsRow struct {
 	UserID        pgtype.UUID
 	Location      *string
 	MeetingFormat MeetingFormat
-	TagGroup      *int32
-	Rank          *float32
+	TagGroup      int32
 	MyEvaluation  interface{}
 }
 
-func (q *Queries) SearchProfiles(ctx context.Context, arg SearchProfilesParams) ([]SearchProfilesRow, error) {
-	rows, err := q.db.Query(ctx, searchProfiles,
+func (q *Queries) SearchProfilesByTags(ctx context.Context, arg SearchProfilesByTagsParams) ([]SearchProfilesByTagsRow, error) {
+	rows, err := q.db.Query(ctx, searchProfilesByTags,
 		arg.EvaluatorID,
 		arg.LocationNorm,
 		arg.MeetingFormat,
 		arg.OffsetCount,
 		arg.LimitCount,
-		arg.QueryNorm,
-		arg.Lexemes,
+		arg.TagIds,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []SearchProfilesRow
+	var items []SearchProfilesByTagsRow
 	for rows.Next() {
-		var i SearchProfilesRow
+		var i SearchProfilesByTagsRow
 		if err := rows.Scan(
 			&i.UserID,
 			&i.Location,
 			&i.MeetingFormat,
 			&i.TagGroup,
-			&i.Rank,
 			&i.MyEvaluation,
 		); err != nil {
 			return nil, err

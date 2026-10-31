@@ -1,9 +1,13 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
+
+	"github.com/clubmatch/clubmatch/internal/profile"
+	"github.com/clubmatch/clubmatch/internal/store"
 )
 
 type searchTestResponse struct {
@@ -25,7 +29,7 @@ func doSearch(t *testing.T, e *testEnv, tgID int64, query string) (int, searchTe
 	return rec.Code, out
 }
 
-func TestSearchTagBeatsText(t *testing.T) {
+func TestSearchTagOnly(t *testing.T) {
 	e := newTestEnv(t)
 	tag := "KafkaSearch" + runID
 
@@ -40,15 +44,10 @@ func TestSearchTagBeatsText(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("search: %d", code)
 	}
-	if len(res.Items) < 2 {
-		t.Fatalf("expected both profiles, got %d", len(res.Items))
+	if len(res.Items) != 1 || res.Items[0]["id"] != uuidString(tagged.ID) {
+		t.Fatalf("MVP tag-only (spec 1.2): only tag profile expected, got %v", res.Items)
 	}
-	if res.Items[0]["id"] != uuidString(tagged.ID) {
-		t.Errorf("tag match must outrank text match: first=%v want %v", res.Items[0]["id"], uuidString(tagged.ID))
-	}
-	if res.Items[1]["id"] != uuidString(textOnly.ID) {
-		t.Errorf("text match second: %v", res.Items[1]["id"])
-	}
+	_ = textOnly
 }
 
 func TestSearchFiltersAndSelfExclusion(t *testing.T) {
@@ -95,9 +94,19 @@ func TestSearchEmptyAndMyEvaluation(t *testing.T) {
 	other := mkProfile(t, e, map[string]any{"skills": []string{tag}})
 	viewer := mkProfile(t, e, map[string]any{"skills": []string{"EmptyViewer" + runID}})
 
-	code, res := doSearch(t, e, viewer.TelegramUserID, "q=no-such-term-"+runID)
+	// Терм не разрешился в тег → 422 (spec 1.2)
+	code, _ := doSearch(t, e, viewer.TelegramUserID, "q=no-such-term-"+runID)
+	if code != http.StatusUnprocessableEntity {
+		t.Fatalf("unknown tag must yield 422, got %d", code)
+	}
+	// Тег существует, но ни у кого нет → пустой 200 (FR-10)
+	freeTag := "FreeTag" + runID
+	if _, err := store.GetOrCreateTag(context.Background(), e.st.Queries, viewer.ID, freeTag, profile.Normalize(freeTag)); err != nil {
+		t.Fatalf("seed free tag: %v", err)
+	}
+	code, res := doSearch(t, e, viewer.TelegramUserID, "q="+freeTag)
 	if code != http.StatusOK || len(res.Items) != 0 {
-		t.Fatalf("empty result: code=%d items=%d", code, len(res.Items))
+		t.Fatalf("existing tag without profiles: code=%d items=%d", code, len(res.Items))
 	}
 
 	rec := call(e.eh.Create, http.MethodPost, "/api/v1/evaluations",

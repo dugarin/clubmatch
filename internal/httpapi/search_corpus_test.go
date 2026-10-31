@@ -55,11 +55,16 @@ func TestSearchCorpusAC5(t *testing.T) {
 	}
 
 	ids := search("Kafka " + sfx)
-	if len(ids) < 4 || ids[0] != uuidString(p1.ID) {
-		t.Fatalf("C1: tag-skill must be first: %v", ids)
+	// spec 1.2 (tag-only): анкеты с тегом — по приоритету полей skill > prof > personal;
+	// анкета с упоминанием в тексте проекта (p2) НЕ находится (полнотекст — post-MVP).
+	if len(ids) != 3 {
+		t.Fatalf("C1: expected 3 tag profiles, got %v", ids)
 	}
-	if indexOf(ids, uuidString(p3.ID)) < 0 || indexOf(ids, uuidString(p4.ID)) < 0 || indexOf(ids, uuidString(p2.ID)) < 0 {
-		t.Fatalf("C1: text/interest matches missing: %v", ids)
+	if ids[0] != uuidString(p1.ID) || indexOf(ids, uuidString(p3.ID)) < 0 || indexOf(ids, uuidString(p4.ID)) < 0 {
+		t.Fatalf("C1: %v", ids)
+	}
+	if indexOf(ids, uuidString(p2.ID)) >= 0 {
+		t.Errorf("C1: text-only profile must not match (spec 1.2): %v", ids)
 	}
 	if indexOf(ids, uuidString(p3.ID)) > indexOf(ids, uuidString(p4.ID)) {
 		t.Errorf("C7: professional_interest must outrank personal_interest: %v", ids)
@@ -84,8 +89,8 @@ func TestSearchCorpusAC5(t *testing.T) {
 	}
 
 	code, res := doSearch(t, e, viewer.TelegramUserID, "q=no-such-term-"+runID)
-	if code != http.StatusOK || len(res.Items) != 0 {
-		t.Fatalf("C5: empty result without error: code=%d items=%d", code, len(res.Items))
+	if code != http.StatusUnprocessableEntity {
+		t.Fatalf("C5: unknown tag must yield 422 (spec 1.2), got %d", code)
 	}
 
 	code, res = doSearch(t, e, viewer.TelegramUserID, "q="+url.QueryEscape("Kafka "+sfx)+"&location=nowhere-"+runID)
