@@ -61,6 +61,11 @@ func NewRouter(db *pgxpool.Pool, cfg config.Config) http.Handler {
 			r.Post("/tags/{id}/aliases", mh.AddAlias)
 		})
 	})
+	// Mini App (embed web/dist, D-6.1): SPA-статика с fallback на index.html.
+	// Маршруты /api/v1, /metrics, /healthz, /readyz, /telegram/webhook имеют приоритет.
+	sh := newStaticHandler(embeddedDist())
+	r.Get("/*", sh.ServeHTTP)
+	r.Head("/*", sh.ServeHTTP)
 	return r
 }
 

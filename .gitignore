@@ -1,5 +1,4 @@
 node_modules/
-dist/
 .env
 .env.*
 !.env.example
@@ -8,5 +7,6 @@ dist/
 __pycache__/
 .venv/
 web/node_modules/
-web/dist/
+web/dist/*
+!web/dist/.gitkeep
 web/tsconfig.tsbuildinfo

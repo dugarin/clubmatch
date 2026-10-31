@@ -2,3 +2,4 @@ D-3.9 гонка подачи заявки | миграция 00008 (части�
 D-3.11 схема notification.payload | типы payload в internal/notify/payload.go, использованы в moderation/evaluations, схема в ADR-002 п.4a; build+test+lint зелёные | 2026-10-31
 D-3.12 коды 404/409 в OpenAPI | добавлены 404 для approve/reject; снято [предположение] с 409 заявок; yaml валиден | 2026-10-31
 D-3.13 RejectUserAccess из none | решение «оставить как есть» зафиксировано в db/queries/users.sql и 01-domain-model.md; build+test зелёные | 2026-10-31
+D-6.1 embed web/dist в Go-бинарь | web/embed.go + internal/httpapi/static.go (SPA-fallback, immutable-кэш assets) + стадия node:20 в Dockerfile; 3 новых теста TestStaticHandler*, весь go test и lint зелёные | 2026-10-31
