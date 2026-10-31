@@ -149,7 +149,7 @@ paths:
       responses:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '201': { description: Заявка принята }
-        '409': { description: 'Активная заявка уже существует [предположение: одна pending-заявка на кандидата — ограничение дизайна, не из требований]' }
+        '409': { description: 'Активная заявка уже существует (одна pending-заявка на кандидата — частичный UNIQUE application_pending_unique, D-3.9)' }
   /moderation/applications:
     get:
       summary: Список заявок (модератор)
@@ -171,6 +171,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '200': { description: OK }
+        '404': { description: Заявка не найдена }
         '409': { description: Решение уже принято }
   /moderation/applications/{id}/reject:
     post:
@@ -182,6 +183,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '200': { description: OK }
+        '404': { description: Заявка не найдена }
         '409': { description: Решение уже принято }
   /moderation/invites:
     post:
