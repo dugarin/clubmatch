@@ -1,0 +1,1 @@
+D-3.9 гонка подачи заявки | миграция 00008 (частичный UNIQUE), 23505→409, тесты TestApplicationPendingUnique + TestApplicationSubmitRace (-race, -p 1) зелёные, lint 0 issues | 2026-10-31
