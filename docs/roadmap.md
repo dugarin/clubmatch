@@ -59,7 +59,7 @@ ADR-001…004 и доменная модель — accepted; UC-1 дополне
 | Задача | Статус |
 |---|---|
 | 3.0.1–3.0.4 каркас, dev-окружение | [x] |
-| 3.0.5–3.0.8 CI, stage, CD, мониторинг | [~] заготовки закоммичены (draft, без проверки — devops-агент отключён) |
+| 3.0.5–3.0.8 CI, stage, CD, мониторинг | [~] конфиги проверены 2026-10-31 (CI дополнен: миграции перед тестами, frontend job web/, promtool entrypoint); не развёрнуто — ждёт сервер (Q-1.3) и секреты STAGE_*/PROD_* |
 | 3.1.1 спайк T-2 (FTS) | [x] [spikes/fts-bilingual.md](spikes/fts-bilingual.md) |
 | 3.1.2 корпус AC-5 (T-3) | [x] [spikes/ac5-corpus.md](spikes/ac5-corpus.md) + search_corpus_test |
 | 3.1.3 спайк T-1 (`tg://user?id`) | [ ] вручную в Telegram |

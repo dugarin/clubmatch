@@ -2,9 +2,7 @@
 # Запуск: docker compose -f docker-compose.stage.yml --profile monitoring up -d
 # UI (через SSH-туннель, см. docs/ops/stage.md): http://127.0.0.1:9090
 #
-# ВАЖНО: эндпоинт /metrics у backend появится в эпике 7 (задача 3.7.1).
-# До этого job clubmatch-server находится в состоянии DOWN — это ожидаемо;
-# алерт ClubmatchServerDown (alerts.yml) будет «гореть» постоянно.
+# /metrics backend реализован (3.7.1): server :8080/metrics, worker :9091/metrics.
 
 global:
   scrape_interval: 15s # окно 15 мин для p95-алертов из 05-risks
@@ -19,9 +17,14 @@ scrape_configs:
       - targets: ["localhost:9090"]
 
   - job_name: clubmatch-server
-    metrics_path: /metrics # TODO(3.7.1): эндпоинт ещё не реализован
+    metrics_path: /metrics
     static_configs:
       - targets: ["server:8080"]
+
+  - job_name: clubmatch-worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["worker:9091"]
 
   - job_name: node # хост-метрики (диск) для алертов группы clubmatch-host
     static_configs:
