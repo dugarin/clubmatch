@@ -35,11 +35,16 @@ export function CardView({ card }: { card: Card }) {
         {card.location ?? '—'} · {card.meeting_format}
         {card.my_evaluation ? ` · your rating: ${card.my_evaluation}` : ''}
       </p>
-      {card.telegram_username && <p>Contact: @{card.telegram_username}</p>}
+      {card.telegram_username && (
+        <p>
+          Contact: <a href={`https://t.me/${card.telegram_username}`}>@{card.telegram_username}</a>
+        </p>
+      )}
       {!card.telegram_username && card.telegram_user_id && (
         <p>
-          Contact:{' '}
-          <a href={`tg://user?id=${card.telegram_user_id}`}>open in Telegram</a>
+          Contact: Telegram ID {card.telegram_user_id}
+          <br />
+          <span className="hint">No public username; a direct chat link by ID is not guaranteed.</span>
         </p>
       )}
     </div>

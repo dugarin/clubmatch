@@ -4,3 +4,5 @@ D-3.12 коды 404/409 в OpenAPI | добавлены 404 для approve/rejec
 D-3.13 RejectUserAccess из none | решение «оставить как есть» зафиксировано в db/queries/users.sql и 01-domain-model.md; build+test зелёные | 2026-10-31
 D-6.1 embed web/dist в Go-бинарь | web/embed.go + internal/httpapi/static.go (SPA-fallback, immutable-кэш assets) + стадия node:20 в Dockerfile; 3 новых теста TestStaticHandler*, весь go test и lint зелёные | 2026-10-31
 D-6.2 UI модерации в MVP-2 | подтверждено: перенос уже утверждён владельцем 2026-10-30 (phase-3-plan.md); dev-open-questions закрыт полностью (17/17), roadmap обновлён | 2026-10-31
+
+T-1 контакт по Telegram ID | исследование официальных Deep links и Bot API: tg://user?id не универсален для Mini App; Q10 уточнён (spec 1.3), UI выдаёт username-ссылку или user id + пояснение; frontend build+lint, go build+test зелёные | 2026-10-31
