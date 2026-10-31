@@ -245,9 +245,11 @@ paths:
                       state: { type: string, enum: [pending, approved, rejected] }
                       created_at: { type: string, format: date-time }
   /telegram/webhook:
+    servers:
+      - url: /
     post:
       summary: Webhook Telegram (только /start и служебные)
-      description: Аутентификация — заголовок X-Telegram-Bot-Api-Secret-Token (secret_token из setWebhook, ADR-002 п.5); без валидного секрета — 401. initData здесь не применяется.
+      description: 'Полный путь /telegram/webhook — вне префикса /api/v1 (решение D-3.4, 2026-10-31). Аутентификация — заголовок X-Telegram-Bot-Api-Secret-Token (secret_token из setWebhook, ADR-002 п.5); без валидного секрета — 401. initData здесь не применяется.'
       security: []
       x-trace: [NFR-7, ADR-002]
       responses:
