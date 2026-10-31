@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/clubmatch/clubmatch/internal/store"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const webhookSecretHeader = "X-Telegram-Bot-Api-Secret-Token"
@@ -17,6 +19,7 @@ type WebhookStore interface {
 	UpsertUserByTelegramID(ctx context.Context, telegramUserID int64, username *string) (store.User, error)
 	SetUserChatID(ctx context.Context, telegramUserID, chatID int64) error
 	ConsumeBotLinkNonce(ctx context.Context, nonce string, telegramUserID int64, ttl time.Duration) (bool, error)
+	ReactivateBlockedNotifications(ctx context.Context, userID pgtype.UUID) error
 }
 
 type tgUpdate struct {
@@ -57,13 +60,17 @@ func NewTelegramWebhookHandler(st WebhookStore, secret string) http.HandlerFunc 
 		if msg.From.Username != "" {
 			username = &msg.From.Username
 		}
-		if _, err := st.UpsertUserByTelegramID(r.Context(), msg.From.ID, username); err != nil {
+		usr, err := st.UpsertUserByTelegramID(r.Context(), msg.From.ID, username)
+		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 			return
 		}
 		if err := st.SetUserChatID(r.Context(), msg.From.ID, msg.Chat.ID); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 			return
+		}
+		if err := st.ReactivateBlockedNotifications(r.Context(), usr.ID); err != nil {
+			slog.Error("webhook: reactivate notifications", "err", err)
 		}
 		if payload := startPayload(msg.Text); payload != "" {
 			_, _ = st.ConsumeBotLinkNonce(r.Context(), payload, msg.From.ID, store.BotLinkNonceTTL)

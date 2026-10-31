@@ -32,6 +32,7 @@ func NewRouter(db *pgxpool.Pool, cfg config.Config) http.Handler {
 		r.Post("/profiles", ph.Create)
 		r.Get("/profiles/me", ph.GetMe)
 		r.Patch("/profiles/me", ph.PatchMe)
+		r.Delete("/profiles/me", ph.DeleteMe)
 		r.Get("/tags/autocomplete", ph.Autocomplete)
 		dh := NewDeckHandler(db, st)
 		r.Get("/deck", dh.Get)

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/clubmatch/clubmatch/internal/store"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const testSecret = "test-webhook-secret"
@@ -47,6 +48,10 @@ func (f *fakeWebhookStore) ConsumeBotLinkNonce(_ context.Context, nonce string, 
 	f.nonceUserID = telegramUserID
 	f.nonceTTL = ttl
 	return f.nonceConsume, nil
+}
+
+func (f *fakeWebhookStore) ReactivateBlockedNotifications(_ context.Context, _ pgtype.UUID) error {
+	return nil
 }
 
 func runWebhook(t *testing.T, st *fakeWebhookStore, secret, body string) *httptest.ResponseRecorder {

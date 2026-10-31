@@ -10,6 +10,8 @@ import (
 
 	"github.com/clubmatch/clubmatch/internal/config"
 	"github.com/clubmatch/clubmatch/internal/logging"
+	"github.com/clubmatch/clubmatch/internal/notify"
+	"github.com/clubmatch/clubmatch/internal/store"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -31,16 +33,12 @@ func main() {
 	}
 	defer db.Close()
 
-	log.Info("notification worker started", "poll", cfg.WorkerPoll)
-	ticker := time.NewTicker(cfg.WorkerPoll)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			log.Info("worker stopped")
-			return
-		case <-ticker.C:
-			log.Debug("outbox poll tick (stub until epic 5)")
-		}
+	backoff := make([]time.Duration, 0, len(cfg.BackoffMinutes))
+	for _, m := range cfg.BackoffMinutes {
+		backoff = append(backoff, time.Duration(m)*time.Minute)
 	}
+	w := notify.NewWorker(store.NewStore(db), notify.NewTelegramBot(cfg.TelegramBotToken), cfg.WorkerPoll, backoff, log)
+	log.Info("notification worker started", "poll", cfg.WorkerPoll)
+	w.Run(ctx)
+	log.Info("worker stopped")
 }
