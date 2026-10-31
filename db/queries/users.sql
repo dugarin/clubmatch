@@ -22,6 +22,8 @@ UPDATE users SET access_state = 'approved'
 WHERE id = $1 AND access_state IN ('none', 'rejected', 'invited');
 
 -- name: RejectUserAccess :exec
+-- D-3.13 (решено 2026-10-31): отклонение заявки переводит в rejected только из none;
+-- параллельное приглашение (invited) при этом не теряется — оставлено как есть.
 UPDATE users SET access_state = 'rejected'
 WHERE id = $1 AND access_state = 'none';
 
