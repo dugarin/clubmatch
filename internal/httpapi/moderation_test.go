@@ -551,3 +551,39 @@ func TestModerationAddAlias(t *testing.T) {
 		t.Error("search by alias returned nothing")
 	}
 }
+
+func TestRevokedTagNotReusable(t *testing.T) {
+	e := newTestEnv(t)
+	ctx := context.Background()
+	mod := e.createModerator(t)
+	tag := "RevokedReuse" + runID
+	owner := mkProfile(t, e, map[string]any{"skills": []string{tag}})
+
+	tagRow, err := e.st.GetTagByNormalized(ctx, profile.Normalize(tag))
+	if err != nil {
+		t.Fatalf("find tag: %v", err)
+	}
+	rec := callH(e.modMux(), http.MethodPost, "/api/v1/moderation/tags/"+uuidString(tagRow.ID)+"/revoke", nil, mod.TelegramUserID)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("revoke: %d %s", rec.Code, rec.Body.String())
+	}
+	// Участник owner потерял навык → not searchable; чинит, добавляя другой навык
+	rec = call(e.h.PatchMe, http.MethodPatch, "/api/v1/profiles/me",
+		map[string]any{"skills": []string{"OtherSkill" + runID}}, owner.TelegramUserID)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("patch owner: %d %s", rec.Code, rec.Body.String())
+	}
+	// Повторный ввод отозванного значения → 422 (D-3.2)
+	other := e.createUser(t, "approved")
+	rec = call(e.h.Create, http.MethodPost, "/api/v1/profiles",
+		map[string]any{"first_name": "Bob", "skills": []string{tag}, "meeting_format": "any", "consent_version": "v1"},
+		other.TelegramUserID)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("revoked tag reuse: %d %s", rec.Code, rec.Body.String())
+	}
+	rec = call(e.h.PatchMe, http.MethodPatch, "/api/v1/profiles/me",
+		map[string]any{"skills": []string{"OtherSkill" + runID, tag}}, owner.TelegramUserID)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("revoked tag reuse via patch: %d %s", rec.Code, rec.Body.String())
+	}
+}

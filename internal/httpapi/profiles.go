@@ -359,6 +359,10 @@ func (h *ProfileHandler) Create(w http.ResponseWriter, r *http.Request) {
 		{store.ProfileTagKindPersonalInterest, in.PersonalInterests},
 	} {
 		if err := replaceTags(ctx, qtx, u.ID, spec.kind, spec.values); err != nil {
+			if errors.Is(err, store.ErrTagRevoked) {
+				writeErr(w, http.StatusUnprocessableEntity, "tag rejected by moderation", string(spec.kind))
+				return
+			}
 			slog.Error("profiles: replace tags", "kind", spec.kind, "err", err)
 			writeErr(w, http.StatusInternalServerError, "internal error")
 			return
@@ -495,6 +499,10 @@ func (h *ProfileHandler) PatchMe(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if err := replaceTags(ctx, qtx, u.ID, spec.kind, *spec.patch); err != nil {
+			if errors.Is(err, store.ErrTagRevoked) {
+				writeErr(w, http.StatusUnprocessableEntity, "tag rejected by moderation", string(spec.kind))
+				return
+			}
 			slog.Error("profiles: replace tags", "kind", spec.kind, "err", err)
 			writeErr(w, http.StatusInternalServerError, "internal error")
 			return

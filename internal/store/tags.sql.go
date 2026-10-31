@@ -106,13 +106,12 @@ func (q *Queries) CreateTagAlias(ctx context.Context, arg CreateTagAliasParams) 
 const findTagByNormalizedOrLexemes = `-- name: FindTagByNormalizedOrLexemes :one
 SELECT t.id, t.canonical, t.normalized, t.status, t.created_by
 FROM tag t
-WHERE t.status = 'active'
-  AND (t.normalized = $1
+WHERE (t.normalized = $1
        OR EXISTS (SELECT 1 FROM tag_alias a
                   WHERE a.tag_id = t.id
                     AND (a.normalized = $1
                          OR (cardinality($2::text[]) > 0 AND a.lexemes = $2::text[]))))
-ORDER BY (t.normalized = $1) DESC
+ORDER BY (t.normalized = $1) DESC, (t.status = 'active') DESC
 LIMIT 1
 `
 

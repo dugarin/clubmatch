@@ -9,9 +9,13 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// ErrTagRevoked — значение совпало с отозванным модерацией тегом (D-3.2, вариант б).
+var ErrTagRevoked = errors.New("tag rejected by moderation")
+
 // GetOrCreateTag resolves a raw user-entered value to an existing tag
 // (by normalized form or by stemmed lexemes of canonical/aliases) or creates
-// a new active tag with the value as its first alias.
+// a new active tag with the value as its first alias. Revoked tags are not
+// reused: resolving to one yields ErrTagRevoked (D-3.2).
 func GetOrCreateTag(ctx context.Context, q *Queries, createdBy pgtype.UUID, raw, normalized string) (Tag, error) {
 	lexemes, err := q.LexemesOfText(ctx, normalized)
 	if err != nil {
@@ -22,6 +26,9 @@ func GetOrCreateTag(ctx context.Context, q *Queries, createdBy pgtype.UUID, raw,
 		Column2:    lexemes,
 	})
 	if err == nil {
+		if t.Status == TagStatusRevoked {
+			return Tag{}, ErrTagRevoked
+		}
 		return t, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
@@ -35,6 +42,9 @@ func GetOrCreateTag(ctx context.Context, q *Queries, createdBy pgtype.UUID, raw,
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Concurrent insert won the unique(normalized) race.
 		t, err = q.GetTagByNormalized(ctx, normalized)
+		if err == nil && t.Status == TagStatusRevoked {
+			return Tag{}, ErrTagRevoked
+		}
 	}
 	if err != nil {
 		return Tag{}, err
