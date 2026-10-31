@@ -9,8 +9,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
+	"unicode/utf8"
 
+	"github.com/clubmatch/clubmatch/internal/profile"
 	"github.com/clubmatch/clubmatch/internal/store"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
@@ -382,5 +385,99 @@ func (h *ModerationHandler) RevokeTag(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"id":     uuidString(tagID),
 		"status": string(store.TagStatusRevoked),
+	})
+}
+
+// AddAlias добавляет алиас к тегу (модератор; D-3.1 — кросс-скриптовые алиасы).
+func (h *ModerationHandler) AddAlias(w http.ResponseWriter, r *http.Request) {
+	mod, ok := h.moderator(w, r)
+	if !ok {
+		return
+	}
+	var tagID pgtype.UUID
+	if err := tagID.Scan(chi.URLParam(r, "id")); err != nil || !tagID.Valid {
+		writeErr(w, http.StatusBadRequest, "invalid tag id")
+		return
+	}
+	var dto struct {
+		Alias string `json:"alias"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	alias := strings.TrimSpace(dto.Alias)
+	if n := utf8.RuneCountInString(alias); n < 2 || n > 64 {
+		writeErr(w, http.StatusUnprocessableEntity, "alias must be 2..64 characters", "alias")
+		return
+	}
+
+	ctx := r.Context()
+	tx, err := h.pool.Begin(ctx)
+	if err != nil {
+		slog.Error("moderation: begin tx", "err", err)
+		writeErr(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	qtx := h.st.WithTx(tx)
+
+	tag, err := qtx.GetTagByID(ctx, tagID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		writeErr(w, http.StatusNotFound, "tag not found")
+		return
+	}
+	if err != nil {
+		slog.Error("moderation: load tag", "err", err)
+		writeErr(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if tag.Status != store.TagStatusActive {
+		writeErr(w, http.StatusConflict, "tag is revoked")
+		return
+	}
+	norm := profile.Normalize(alias)
+	if _, err := qtx.GetAliasByNormalized(ctx, norm); err == nil {
+		writeErr(w, http.StatusConflict, "alias already exists")
+		return
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		slog.Error("moderation: check alias", "err", err)
+		writeErr(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	lex, err := qtx.LexemesOfText(ctx, alias)
+	if err != nil {
+		slog.Error("moderation: lexemes", "err", err)
+		writeErr(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if err := qtx.CreateTagAlias(ctx, store.CreateTagAliasParams{
+		TagID:      tagID,
+		Alias:      alias,
+		Normalized: norm,
+		Lexemes:    lex,
+	}); err != nil {
+		slog.Error("moderation: create alias", "err", err)
+		writeErr(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if err := qtx.InsertModerationJournal(ctx, store.InsertModerationJournalParams{
+		ModeratorID: mod.ID,
+		Action:      store.ModerationActionAliasAdded,
+		TargetType:  store.ModerationTargetTypeTag,
+		TargetID:    tagID,
+	}); err != nil {
+		slog.Error("moderation: insert journal", "err", err)
+		writeErr(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if err := tx.Commit(ctx); err != nil {
+		slog.Error("moderation: commit", "err", err)
+		writeErr(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]string{
+		"tag_id": uuidString(tagID),
+		"alias":  alias,
 	})
 }

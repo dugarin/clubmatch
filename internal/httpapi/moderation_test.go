@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/clubmatch/clubmatch/internal/auth"
+	"github.com/clubmatch/clubmatch/internal/profile"
 	"github.com/clubmatch/clubmatch/internal/store"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -34,6 +35,7 @@ func (e *testEnv) modMux() http.Handler {
 	r.Post("/api/v1/moderation/applications/{id}/reject", e.mh.Reject)
 	r.Post("/api/v1/moderation/invites", e.mh.CreateInvite)
 	r.Post("/api/v1/moderation/tags/{id}/revoke", e.mh.RevokeTag)
+	r.Post("/api/v1/moderation/tags/{id}/aliases", e.mh.AddAlias)
 	return r
 }
 
@@ -489,5 +491,63 @@ func TestModerationRevokeTag(t *testing.T) {
 	}
 	if !restored {
 		t.Error("A.is_searchable not restored after adding a new skill")
+	}
+}
+
+func TestModerationAddAlias(t *testing.T) {
+	e := newTestEnv(t)
+	ctx := context.Background()
+	mod := e.createModerator(t)
+	tag := "AliasTarget" + runID
+	mkProfile(t, e, map[string]any{"skills": []string{tag}})
+
+	tagRow, err := e.st.GetTagByNormalized(ctx, profile.Normalize(tag))
+	if err != nil {
+		t.Fatalf("find tag: %v", err)
+	}
+	mux := e.modMux()
+	tagID := uuidString(tagRow.ID)
+
+	rec := callH(mux, http.MethodPost, "/api/v1/moderation/tags/"+tagID+"/aliases",
+		map[string]string{"alias": "Алиас " + runID}, mod.TelegramUserID)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("add alias: %d %s", rec.Code, rec.Body.String())
+	}
+	// Повторный алиас → 409
+	rec = callH(mux, http.MethodPost, "/api/v1/moderation/tags/"+tagID+"/aliases",
+		map[string]string{"alias": "Алиас " + runID}, mod.TelegramUserID)
+	if rec.Code != http.StatusConflict {
+		t.Errorf("duplicate alias: %d", rec.Code)
+	}
+	// Несуществующий тег → 404
+	rec = callH(mux, http.MethodPost, "/api/v1/moderation/tags/00000000-0000-0000-0000-000000000000/aliases",
+		map[string]string{"alias": "Xy"}, mod.TelegramUserID)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("missing tag: %d", rec.Code)
+	}
+	// Не-модератор → 403
+	plain := e.createUser(t, "approved")
+	rec = callH(mux, http.MethodPost, "/api/v1/moderation/tags/"+tagID+"/aliases",
+		map[string]string{"alias": "Zz"}, plain.TelegramUserID)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("non-moderator: %d", rec.Code)
+	}
+	// Журнал
+	var n int
+	if err := e.pool.QueryRow(ctx,
+		"SELECT count(*) FROM moderation_journal WHERE action = 'alias_added' AND target_id = $1",
+		tagRow.ID).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("journal entries = %d, want 1", n)
+	}
+	// Алиас работает в поиске (лексемы)
+	code, res := doSearch(t, e, mod.TelegramUserID, "q="+url.QueryEscape("Алиас "+runID))
+	if code != http.StatusOK {
+		t.Fatalf("search by alias: %d", code)
+	}
+	if len(res.Items) == 0 {
+		t.Error("search by alias returned nothing")
 	}
 }

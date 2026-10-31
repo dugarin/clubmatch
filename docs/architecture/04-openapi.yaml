@@ -198,6 +198,52 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '200': { description: OK }
+        '404': { description: Тег не найден }
+        '409': { description: Тег уже отозван }
+  /moderation/tags/{id}/aliases:
+    post:
+      summary: Добавить алиас тегу (модератор; кросс-скриптовые алиасы, D-3.1)
+      x-trace: [FR-4, FR-15, FR-10]
+      tags: [moderation]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [alias]
+              properties:
+                alias: { type: string, minLength: 2, maxLength: 64 }
+      responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '201': { description: Алиас добавлен }
+        '404': { description: Тег не найден }
+        '409': { description: Алиас уже существует / тег отозван }
+        '422': { description: Границы поля alias }
+  /applications/me:
+    get:
+      summary: Статус своей заявки (экран статуса в Mini App, ADR-002)
+      x-trace: [FR-13, UC-6]
+      tags: [profile]
+      responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '200':
+          description: access_state и последняя заявка
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_state: { type: string }
+                  application:
+                    nullable: true
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      state: { type: string, enum: [pending, approved, rejected] }
+                      created_at: { type: string, format: date-time }
   /telegram/webhook:
     post:
       summary: Webhook Telegram (только /start и служебные)

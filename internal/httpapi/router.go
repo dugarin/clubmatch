@@ -58,6 +58,7 @@ func NewRouter(db *pgxpool.Pool, cfg config.Config) http.Handler {
 			r.Post("/applications/{id}/reject", mh.Reject)
 			r.Post("/invites", mh.CreateInvite)
 			r.Post("/tags/{id}/revoke", mh.RevokeTag)
+			r.Post("/tags/{id}/aliases", mh.AddAlias)
 		})
 	})
 	return r

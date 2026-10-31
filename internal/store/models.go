@@ -230,6 +230,7 @@ const (
 	ModerationActionApplicationRejected ModerationAction = "application_rejected"
 	ModerationActionInviteCreated       ModerationAction = "invite_created"
 	ModerationActionTagRevoked          ModerationAction = "tag_revoked"
+	ModerationActionAliasAdded          ModerationAction = "alias_added"
 )
 
 func (e *ModerationAction) Scan(src interface{}) error {

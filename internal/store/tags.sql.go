@@ -134,6 +134,23 @@ func (q *Queries) FindTagByNormalizedOrLexemes(ctx context.Context, arg FindTagB
 	return i, err
 }
 
+const getAliasByNormalized = `-- name: GetAliasByNormalized :one
+SELECT id, tag_id, alias, normalized, lexemes FROM tag_alias WHERE normalized = $1
+`
+
+func (q *Queries) GetAliasByNormalized(ctx context.Context, normalized string) (TagAlias, error) {
+	row := q.db.QueryRow(ctx, getAliasByNormalized, normalized)
+	var i TagAlias
+	err := row.Scan(
+		&i.ID,
+		&i.TagID,
+		&i.Alias,
+		&i.Normalized,
+		&i.Lexemes,
+	)
+	return i, err
+}
+
 const getTagByID = `-- name: GetTagByID :one
 SELECT id, canonical, normalized, status, created_by FROM tag WHERE id = $1
 `

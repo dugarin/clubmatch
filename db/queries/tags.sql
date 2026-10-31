@@ -16,6 +16,9 @@ LIMIT 1;
 -- name: GetTagByNormalized :one
 SELECT * FROM tag WHERE normalized = $1;
 
+-- name: GetAliasByNormalized :one
+SELECT id, tag_id, alias, normalized, lexemes FROM tag_alias WHERE normalized = $1;
+
 -- name: GetTagByID :one
 SELECT * FROM tag WHERE id = $1;
 
