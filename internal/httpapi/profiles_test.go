@@ -35,6 +35,8 @@ type testEnv struct {
 	h    *ProfileHandler
 	ah   *ApplicationHandler
 	mh   *ModerationHandler
+	dh   *DeckHandler
+	eh   *EvaluationHandler
 }
 
 func newTestEnv(t *testing.T) *testEnv {
@@ -55,6 +57,8 @@ func newTestEnv(t *testing.T) *testEnv {
 		h:    NewProfileHandler(pool, st),
 		ah:   NewApplicationHandler(pool, st),
 		mh:   NewModerationHandler(pool, st, "testbot", "testapp"),
+		dh:   NewDeckHandler(pool, st),
+		eh:   NewEvaluationHandler(pool, st),
 	}
 }
 
@@ -492,6 +496,63 @@ func TestPatchMe(t *testing.T) {
 		map[string]any{"first_name": "Анна"}, u2.TelegramUserID)
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("patch without profile: status = %d, want 404", rec.Code)
+	}
+}
+
+// D-3.10: is_searchable вычисляется от числа навыков при каждом сохранении.
+// PATCH без навыков после потери последнего навыка не восстанавливает
+// видимость; PATCH с навыком — восстанавливает (FR-4).
+func TestPatchSearchableAfterSkillLoss(t *testing.T) {
+	e := newTestEnv(t)
+	ctx := context.Background()
+	u := e.createUser(t, "approved")
+	rec := call(e.h.Create, http.MethodPost, "/api/v1/profiles", validProfileBody(), u.TelegramUserID)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
+	}
+	isSearchable := func() bool {
+		var v bool
+		if err := e.pool.QueryRow(ctx, "SELECT is_searchable FROM profile WHERE user_id = $1", u.ID).Scan(&v); err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	if !isSearchable() {
+		t.Fatal("is_searchable must be true after onboarding")
+	}
+
+	// модератор отозвал последний навык: тег удалён из анкеты, видимость снята (FR-4)
+	if _, err := e.pool.Exec(ctx, "DELETE FROM profile_tag WHERE profile_id = $1 AND kind = 'skill'", u.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.pool.Exec(ctx, "UPDATE profile SET is_searchable = false WHERE user_id = $1", u.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// PATCH, не затрагивающий навыки, не должен восстановить видимость
+	rec = call(e.h.PatchMe, http.MethodPatch, "/api/v1/profiles/me",
+		map[string]any{"first_name": "Анна"}, u.TelegramUserID)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("patch first_name: %d %s", rec.Code, rec.Body.String())
+	}
+	if isSearchable() {
+		t.Error("is_searchable restored by unrelated patch (D-3.10)")
+	}
+	if out := decodeSelf(t, rec); out.IsSearchable {
+		t.Error("response: is_searchable = true, want false")
+	}
+
+	// PATCH с навыком восстанавливает видимость
+	rec = call(e.h.PatchMe, http.MethodPatch, "/api/v1/profiles/me",
+		map[string]any{"skills": []string{"Go Autotest" + runID}}, u.TelegramUserID)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("patch skills: %d %s", rec.Code, rec.Body.String())
+	}
+	if !isSearchable() {
+		t.Error("is_searchable must be restored after adding a skill")
+	}
+	if out := decodeSelf(t, rec); !out.IsSearchable {
+		t.Error("response: is_searchable = false, want true")
 	}
 }
 

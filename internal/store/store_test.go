@@ -92,7 +92,7 @@ func TestProfileRoundTrip(t *testing.T) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 	loc := "Berlin"
-	p := UpsertProfileParams{UserID: u.ID, FirstName: "Ann", Location: &loc, LocationNorm: &loc, MeetingFormat: "online", IsSearchable: true}
+	p := UpsertProfileParams{UserID: u.ID, FirstName: "Ann", Location: &loc, LocationNorm: &loc, MeetingFormat: "online"}
 	if err := s.UpsertProfile(ctx, p); err != nil {
 		t.Fatalf("insert profile: %v", err)
 	}

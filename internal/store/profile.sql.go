@@ -283,6 +283,24 @@ func (q *Queries) RebuildProfileFTS(ctx context.Context, userID pgtype.UUID) err
 	return err
 }
 
+const refreshProfileSearchable = `-- name: RefreshProfileSearchable :exec
+UPDATE profile p
+SET is_searchable = EXISTS (
+    SELECT 1
+    FROM profile_tag pt
+    JOIN tag t ON t.id = pt.tag_id
+    WHERE pt.profile_id = p.user_id
+      AND pt.kind = 'skill'
+      AND t.status = 'active'
+)
+WHERE p.user_id = $1
+`
+
+func (q *Queries) RefreshProfileSearchable(ctx context.Context, userID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, refreshProfileSearchable, userID)
+	return err
+}
+
 const setProfileSearchable = `-- name: SetProfileSearchable :exec
 UPDATE profile SET is_searchable = $2 WHERE user_id = $1
 `
@@ -298,15 +316,14 @@ func (q *Queries) SetProfileSearchable(ctx context.Context, arg SetProfileSearch
 }
 
 const upsertProfile = `-- name: UpsertProfile :exec
-INSERT INTO profile (user_id, first_name, last_name, location, location_norm, meeting_format, is_searchable)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO profile (user_id, first_name, last_name, location, location_norm, meeting_format)
+VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (user_id) DO UPDATE
 SET first_name = EXCLUDED.first_name,
     last_name = EXCLUDED.last_name,
     location = EXCLUDED.location,
     location_norm = EXCLUDED.location_norm,
     meeting_format = EXCLUDED.meeting_format,
-    is_searchable = EXCLUDED.is_searchable,
     updated_at = now()
 `
 
@@ -317,7 +334,6 @@ type UpsertProfileParams struct {
 	Location      *string
 	LocationNorm  *string
 	MeetingFormat MeetingFormat
-	IsSearchable  bool
 }
 
 func (q *Queries) UpsertProfile(ctx context.Context, arg UpsertProfileParams) error {
@@ -328,7 +344,6 @@ func (q *Queries) UpsertProfile(ctx context.Context, arg UpsertProfileParams) er
 		arg.Location,
 		arg.LocationNorm,
 		arg.MeetingFormat,
-		arg.IsSearchable,
 	)
 	return err
 }

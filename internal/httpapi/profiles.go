@@ -244,7 +244,6 @@ func upsertProfileFields(ctx context.Context, qtx *store.Queries, userID pgtype.
 		Location:      location,
 		LocationNorm:  locationNorm,
 		MeetingFormat: store.MeetingFormat(in.MeetingFormat),
-		IsSearchable:  true,
 	})
 }
 
@@ -367,6 +366,11 @@ func (h *ProfileHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := replaceProjects(ctx, qtx, u.ID, in.Projects); err != nil {
 		slog.Error("profiles: replace projects", "err", err)
+		writeErr(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if err := qtx.RefreshProfileSearchable(ctx, u.ID); err != nil {
+		slog.Error("profiles: refresh searchable", "err", err)
 		writeErr(w, http.StatusInternalServerError, "internal error")
 		return
 	}
@@ -502,6 +506,11 @@ func (h *ProfileHandler) PatchMe(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusInternalServerError, "internal error")
 			return
 		}
+	}
+	if err := qtx.RefreshProfileSearchable(ctx, u.ID); err != nil {
+		slog.Error("profiles: refresh searchable", "err", err)
+		writeErr(w, http.StatusInternalServerError, "internal error")
+		return
 	}
 	if err := qtx.RebuildProfileFTS(ctx, u.ID); err != nil {
 		slog.Error("profiles: rebuild fts", "err", err)
