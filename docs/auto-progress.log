@@ -3,3 +3,4 @@ D-3.11 схема notification.payload | типы payload в internal/notify/pay
 D-3.12 коды 404/409 в OpenAPI | добавлены 404 для approve/reject; снято [предположение] с 409 заявок; yaml валиден | 2026-10-31
 D-3.13 RejectUserAccess из none | решение «оставить как есть» зафиксировано в db/queries/users.sql и 01-domain-model.md; build+test зелёные | 2026-10-31
 D-6.1 embed web/dist в Go-бинарь | web/embed.go + internal/httpapi/static.go (SPA-fallback, immutable-кэш assets) + стадия node:20 в Dockerfile; 3 новых теста TestStaticHandler*, весь go test и lint зелёные | 2026-10-31
+D-6.2 UI модерации в MVP-2 | подтверждено: перенос уже утверждён владельцем 2026-10-30 (phase-3-plan.md); dev-open-questions закрыт полностью (17/17), roadmap обновлён | 2026-10-31
