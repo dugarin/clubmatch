@@ -8,6 +8,7 @@ import (
 
 	"github.com/clubmatch/clubmatch/internal/store"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -66,6 +67,11 @@ func (h *ApplicationHandler) Submit(w http.ResponseWriter, r *http.Request) {
 	}
 	a, err := h.st.CreateApplication(ctx, u.ID)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "application_pending_unique" {
+			writeErr(w, http.StatusConflict, "active application already exists")
+			return
+		}
 		slog.Error("applications: create", "err", err)
 		writeErr(w, http.StatusInternalServerError, "internal error")
 		return

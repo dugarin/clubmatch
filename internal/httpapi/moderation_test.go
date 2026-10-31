@@ -152,6 +152,36 @@ func TestApplicationSubmitAndStatus(t *testing.T) {
 	}
 }
 
+// D-3.9: гонка одновременных подач — ровно одна 201, остальные 409
+// (частичный UNIQUE application_pending_unique).
+func TestApplicationSubmitRace(t *testing.T) {
+	e := newTestEnv(t)
+	u := e.createUser(t, "none")
+
+	const n = 8
+	codes := make(chan int, n)
+	for range n {
+		go func() {
+			rec := call(e.ah.Submit, http.MethodPost, "/api/v1/applications", nil, u.TelegramUserID)
+			codes <- rec.Code
+		}()
+	}
+	created, conflict := 0, 0
+	for range n {
+		switch c := <-codes; c {
+		case http.StatusCreated:
+			created++
+		case http.StatusConflict:
+			conflict++
+		default:
+			t.Errorf("unexpected status %d", c)
+		}
+	}
+	if created != 1 || conflict != n-1 {
+		t.Errorf("created = %d, conflict = %d; want 1 и %d", created, conflict, n-1)
+	}
+}
+
 func TestModerationGateForbidden(t *testing.T) {
 	e := newTestEnv(t)
 	mux := e.modMux()

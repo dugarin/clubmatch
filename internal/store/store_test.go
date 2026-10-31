@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -147,6 +148,30 @@ func TestApplicationCreateAndGetPending(t *testing.T) {
 	}
 	if got.ID != a.ID {
 		t.Errorf("got %s, want %s", got.ID, a.ID)
+	}
+}
+
+func TestApplicationPendingUnique(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	u, err := s.UpsertUserByTelegramID(ctx, nextTG(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := s.CreateApplication(ctx, u.ID)
+	if err != nil {
+		t.Fatalf("create first: %v", err)
+	}
+	_, err = s.CreateApplication(ctx, u.ID)
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "23505" || pgErr.ConstraintName != "application_pending_unique" {
+		t.Fatalf("expected unique violation, got %v", err)
+	}
+	if _, err := s.DecideApplication(ctx, DecideApplicationParams{ID: a.ID, State: ApplicationStateRejected}); err != nil {
+		t.Fatalf("decide: %v", err)
+	}
+	if _, err := s.CreateApplication(ctx, u.ID); err != nil {
+		t.Fatalf("create after rejection: %v", err)
 	}
 }
 
