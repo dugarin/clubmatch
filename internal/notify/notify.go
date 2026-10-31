@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/clubmatch/clubmatch/internal/observ"
 	"github.com/clubmatch/clubmatch/internal/store"
 	"github.com/jackc/pgx/v5"
 )
@@ -119,6 +120,9 @@ func (w *Worker) backoffDelay(attempts int32) time.Duration {
 }
 
 func (w *Worker) ProcessOnce(ctx context.Context) (int, error) {
+	if depth, err := w.st.OutboxDepth(ctx); err == nil {
+		observ.OutboxDepth.Set(float64(depth))
+	}
 	rows, err := w.st.ClaimDueNotifications(ctx)
 	if err != nil {
 		return 0, err
@@ -148,12 +152,16 @@ func (w *Worker) process(ctx context.Context, n store.ClaimDueNotificationsRow) 
 		if err := w.st.MarkNotificationSent(ctx, n.ID); err != nil {
 			w.log.Error("notify: mark sent", "err", err)
 		}
+		observ.NotificationSent.Inc()
+		observ.NotificationLag.Observe(time.Since(n.CreatedAt.Time).Seconds())
 	case ErrBlocked:
 		if err := w.st.MarkNotificationBlocked(ctx, n.ID); err != nil {
 			w.log.Error("notify: mark blocked", "err", err)
 		}
+		observ.NotificationBlocked.Inc()
 	default:
 		w.log.Warn("notify: send failed", "err", err, "attempts", n.Attempts)
+		observ.NotificationRetried.Inc()
 		w.reschedule(ctx, n)
 	}
 }

@@ -7,7 +7,10 @@ WHERE id IN (
     LIMIT 50
     FOR UPDATE SKIP LOCKED
 )
-RETURNING id, type::text AS type, user_id, payload, attempts;
+RETURNING id, type::text AS type, user_id, payload, attempts, created_at;
+
+-- name: OutboxDepth :one
+SELECT count(*) FROM notification WHERE state = 'pending';
 
 -- name: MarkNotificationSent :exec
 UPDATE notification SET state = 'sent' WHERE id = $1;

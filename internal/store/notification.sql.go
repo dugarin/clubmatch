@@ -20,15 +20,16 @@ WHERE id IN (
     LIMIT 50
     FOR UPDATE SKIP LOCKED
 )
-RETURNING id, type::text AS type, user_id, payload, attempts
+RETURNING id, type::text AS type, user_id, payload, attempts, created_at
 `
 
 type ClaimDueNotificationsRow struct {
-	ID       pgtype.UUID
-	Type     string
-	UserID   pgtype.UUID
-	Payload  []byte
-	Attempts int32
+	ID        pgtype.UUID
+	Type      string
+	UserID    pgtype.UUID
+	Payload   []byte
+	Attempts  int32
+	CreatedAt pgtype.Timestamptz
 }
 
 func (q *Queries) ClaimDueNotifications(ctx context.Context) ([]ClaimDueNotificationsRow, error) {
@@ -46,6 +47,7 @@ func (q *Queries) ClaimDueNotifications(ctx context.Context) ([]ClaimDueNotifica
 			&i.UserID,
 			&i.Payload,
 			&i.Attempts,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -84,6 +86,17 @@ UPDATE notification SET state = 'sent' WHERE id = $1
 func (q *Queries) MarkNotificationSent(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, markNotificationSent, id)
 	return err
+}
+
+const outboxDepth = `-- name: OutboxDepth :one
+SELECT count(*) FROM notification WHERE state = 'pending'
+`
+
+func (q *Queries) OutboxDepth(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, outboxDepth)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const reactivateBlockedNotifications = `-- name: ReactivateBlockedNotifications :exec
