@@ -41,6 +41,7 @@ paths:
       responses:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ProfileSelf' } } } }
+        '404': { description: Анкета не создана (D-3.5) }
     patch:
       summary: Редактирование анкеты (инвариант обязательных полей)
       x-trace: [FR-2, FR-3, UC-2]
@@ -52,6 +53,7 @@ paths:
       responses:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ProfileSelf' } } } }
+        '404': { description: Анкета не создана (D-3.5) }
         '422': { description: Пустое обязательное поле (UC-2 E1) }
     delete:
       summary: Удаление анкеты
@@ -70,6 +72,7 @@ paths:
       responses:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Tag' } } } } }
+        '400': { description: 'q вне 1..64 символов (D-3.5)' }
   /deck:
     get:
       summary: Следующая порция карточек колоды
