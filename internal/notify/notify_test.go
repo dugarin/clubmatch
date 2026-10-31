@@ -34,6 +34,10 @@ func testWorker(t *testing.T, bot BotClient) (*Worker, *store.Store, *pgxpool.Po
 		t.Fatalf("connect: %v", err)
 	}
 	t.Cleanup(pool.Close)
+	if _, err := pool.Exec(context.Background(),
+		`TRUNCATE notification, users CASCADE`); err != nil {
+		t.Fatalf("truncate: %v", err)
+	}
 	st := store.NewStore(pool)
 	w := NewWorker(st, bot, time.Second, []time.Duration{time.Minute, 5 * time.Minute}, slog.Default())
 	return w, st, pool

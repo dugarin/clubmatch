@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -13,6 +14,7 @@ type Config struct {
 	TelegramBotToken string
 	WebhookSecret    string
 	MetricsAddr      string
+	ModeratorTGIDs   []int64
 	BotUsername      string
 	MiniAppName      string
 	InitDataTTL      time.Duration
@@ -43,6 +45,7 @@ func Load() (Config, error) {
 		TelegramBotToken: os.Getenv("TELEGRAM_BOT_TOKEN"),
 		WebhookSecret:    os.Getenv("TELEGRAM_WEBHOOK_SECRET"),
 		MetricsAddr:      getenv("METRICS_ADDR", ":9091"),
+		ModeratorTGIDs:   parseIDList(os.Getenv("MODERATOR_TG_IDS")),
 		BotUsername:      os.Getenv("TELEGRAM_BOT_USERNAME"),
 		MiniAppName:      os.Getenv("TELEGRAM_MINIAPP_NAME"),
 		InitDataTTL:      time.Duration(ttl) * time.Hour,
@@ -54,4 +57,20 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")
 	}
 	return cfg, nil
+}
+
+func parseIDList(raw string) []int64 {
+	var out []int64
+	for _, s := range strings.Split(raw, ",") {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		id, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			continue
+		}
+		out = append(out, id)
+	}
+	return out
 }

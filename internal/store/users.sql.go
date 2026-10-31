@@ -21,6 +21,17 @@ func (q *Queries) ApproveUserAccess(ctx context.Context, id pgtype.UUID) error {
 	return err
 }
 
+const ensureModeratorByTelegramID = `-- name: EnsureModeratorByTelegramID :exec
+INSERT INTO users (telegram_user_id, role)
+VALUES ($1, 'moderator')
+ON CONFLICT (telegram_user_id) DO UPDATE SET role = 'moderator'
+`
+
+func (q *Queries) EnsureModeratorByTelegramID(ctx context.Context, telegramUserID int64) error {
+	_, err := q.db.Exec(ctx, ensureModeratorByTelegramID, telegramUserID)
+	return err
+}
+
 const getUserByTelegramID = `-- name: GetUserByTelegramID :one
 SELECT id, telegram_user_id, telegram_username, role, access_state, created_at, deleted_at, chat_id FROM users WHERE telegram_user_id = $1 AND deleted_at IS NULL
 `

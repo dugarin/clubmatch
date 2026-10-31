@@ -52,6 +52,12 @@ func newTestEnv(t *testing.T) *testEnv {
 		t.Fatalf("connect: %v", err)
 	}
 	t.Cleanup(pool.Close)
+	if _, err := pool.Exec(context.Background(), `TRUNCATE evaluation_history, evaluation,
+		contact_disclosure_journal, moderation_journal, notification,
+		application, invite, consent, bot_link_nonce,
+		profile_tag, project, profile, tag_alias, tag, match, users CASCADE`); err != nil {
+		t.Fatalf("truncate: %v", err)
+	}
 	st := store.NewStore(pool)
 	return &testEnv{
 		pool: pool,

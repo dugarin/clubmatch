@@ -22,6 +22,12 @@ func testStore(t *testing.T) *Store {
 		t.Fatalf("connect: %v", err)
 	}
 	t.Cleanup(pool.Close)
+	if _, err := pool.Exec(context.Background(), `TRUNCATE evaluation_history, evaluation,
+		contact_disclosure_journal, moderation_journal, notification,
+		application, invite, consent, bot_link_nonce,
+		profile_tag, project, profile, tag_alias, tag, match, users CASCADE`); err != nil {
+		t.Fatalf("truncate: %v", err)
+	}
 	return NewStore(pool)
 }
 
@@ -212,5 +218,24 @@ func TestBotLinkNonce(t *testing.T) {
 	}
 	if ok {
 		t.Error("unknown nonce must not be consumed")
+	}
+}
+
+func TestEnsureModeratorByTelegramID(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	tg := nextTG()
+	if err := s.EnsureModeratorByTelegramID(ctx, tg); err != nil {
+		t.Fatal(err)
+	}
+	u, err := s.GetUserByTelegramID(ctx, tg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Role != "moderator" {
+		t.Errorf("role = %s, want moderator", u.Role)
+	}
+	if err := s.EnsureModeratorByTelegramID(ctx, tg); err != nil {
+		t.Fatal(err)
 	}
 }

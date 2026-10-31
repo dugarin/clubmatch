@@ -27,3 +27,15 @@ func TestLoadRequiresDatabaseURL(t *testing.T) {
 		t.Fatal("expected error for missing DATABASE_URL")
 	}
 }
+
+func TestParseModeratorIDs(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://u:p@h/db")
+	t.Setenv("MODERATOR_TG_IDS", "111, 222,,bad")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.ModeratorTGIDs) != 2 || cfg.ModeratorTGIDs[0] != 111 || cfg.ModeratorTGIDs[1] != 222 {
+		t.Errorf("ModeratorTGIDs = %v", cfg.ModeratorTGIDs)
+	}
+}

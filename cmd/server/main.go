@@ -13,6 +13,7 @@ import (
 	"github.com/clubmatch/clubmatch/internal/config"
 	"github.com/clubmatch/clubmatch/internal/httpapi"
 	"github.com/clubmatch/clubmatch/internal/logging"
+	"github.com/clubmatch/clubmatch/internal/store"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -33,6 +34,15 @@ func main() {
 		os.Exit(1)
 	}
 	defer db.Close()
+
+	st := store.NewStore(db)
+	for _, tgID := range cfg.ModeratorTGIDs {
+		if err := st.EnsureModeratorByTelegramID(ctx, tgID); err != nil {
+			log.Error("assign moderator", "tg_id", tgID, "err", err)
+		} else {
+			log.Info("moderator assigned", "tg_id", tgID)
+		}
+	}
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,

@@ -24,3 +24,8 @@ WHERE id = $1 AND access_state IN ('none', 'rejected', 'invited');
 -- name: RejectUserAccess :exec
 UPDATE users SET access_state = 'rejected'
 WHERE id = $1 AND access_state = 'none';
+
+-- name: EnsureModeratorByTelegramID :exec
+INSERT INTO users (telegram_user_id, role)
+VALUES ($1, 'moderator')
+ON CONFLICT (telegram_user_id) DO UPDATE SET role = 'moderator';
