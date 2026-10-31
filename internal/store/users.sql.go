@@ -57,6 +57,8 @@ UPDATE users SET access_state = 'rejected'
 WHERE id = $1 AND access_state = 'none'
 `
 
+// D-3.13 (решено 2026-10-31): отклонение заявки переводит в rejected только из none;
+// параллельное приглашение (invited) при этом не теряется — оставлено как есть.
 func (q *Queries) RejectUserAccess(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, rejectUserAccess, id)
 	return err

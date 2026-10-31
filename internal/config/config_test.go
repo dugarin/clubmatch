@@ -39,3 +39,33 @@ func TestParseModeratorIDs(t *testing.T) {
 		t.Errorf("ModeratorTGIDs = %v", cfg.ModeratorTGIDs)
 	}
 }
+
+func TestLoadDevAuthEnabled(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://u:p@h/db")
+	t.Setenv("APP_ENV", "dev")
+	t.Setenv("DEV_AUTH_ENABLED", "true")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.DevAuthEnabled {
+		t.Fatal("DevAuthEnabled = false, want true")
+	}
+}
+
+func TestLoadDevAuthRejectedOutsideDev(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://u:p@h/db")
+	t.Setenv("APP_ENV", "stage")
+	t.Setenv("DEV_AUTH_ENABLED", "true")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error when dev auth is enabled on stage")
+	}
+}
+
+func TestLoadDevAuthRejectsInvalidValue(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://u:p@h/db")
+	t.Setenv("DEV_AUTH_ENABLED", "not-a-bool")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error for invalid DEV_AUTH_ENABLED")
+	}
+}

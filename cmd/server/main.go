@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/clubmatch/clubmatch/internal/config"
+	"github.com/clubmatch/clubmatch/internal/devmode"
 	"github.com/clubmatch/clubmatch/internal/httpapi"
 	"github.com/clubmatch/clubmatch/internal/logging"
 	"github.com/clubmatch/clubmatch/internal/store"
@@ -36,6 +37,13 @@ func main() {
 	defer db.Close()
 
 	st := store.NewStore(db)
+	if cfg.DevAuthEnabled && cfg.Env == "dev" {
+		if err := devmode.Seed(ctx, db); err != nil {
+			log.Error("dev seed", "err", err)
+			os.Exit(1)
+		}
+		log.Warn("dev auth enabled; Telegram initData is bypassed")
+	}
 	for _, tgID := range cfg.ModeratorTGIDs {
 		if err := st.EnsureModeratorByTelegramID(ctx, tgID); err != nil {
 			log.Error("assign moderator", "tg_id", tgID, "err", err)

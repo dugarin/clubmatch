@@ -7,6 +7,7 @@ import (
 
 	"github.com/clubmatch/clubmatch/internal/auth"
 	"github.com/clubmatch/clubmatch/internal/config"
+	"github.com/clubmatch/clubmatch/internal/devmode"
 	"github.com/clubmatch/clubmatch/internal/observ"
 	"github.com/clubmatch/clubmatch/internal/store"
 	"github.com/go-chi/chi/v5"
@@ -31,8 +32,12 @@ func NewRouter(db *pgxpool.Pool, cfg config.Config) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
 	})
 	r.Post("/telegram/webhook", NewTelegramWebhookHandler(st, cfg.WebhookSecret))
+	apiAuth := auth.Middleware(st, cfg.TelegramBotToken, cfg.InitDataTTL)
+	if cfg.DevAuthEnabled && cfg.Env == "dev" {
+		apiAuth = devmode.Middleware()
+	}
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Use(auth.Middleware(st, cfg.TelegramBotToken, cfg.InitDataTTL))
+		r.Use(apiAuth)
 		ph := NewProfileHandler(db, st)
 		r.Post("/profiles", ph.Create)
 		r.Get("/profiles/me", ph.GetMe)

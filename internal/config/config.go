@@ -21,6 +21,7 @@ type Config struct {
 	WorkerPoll       time.Duration
 	BackoffMinutes   []int
 	Env              string
+	DevAuthEnabled   bool
 }
 
 func getenv(key, def string) string {
@@ -39,6 +40,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("WORKER_POLL_SECONDS: %w", err)
 	}
+	devAuthEnabled, err := strconv.ParseBool(getenv("DEV_AUTH_ENABLED", "false"))
+	if err != nil {
+		return Config{}, fmt.Errorf("DEV_AUTH_ENABLED: %w", err)
+	}
 	cfg := Config{
 		HTTPAddr:         getenv("HTTP_ADDR", ":8080"),
 		DatabaseURL:      os.Getenv("DATABASE_URL"),
@@ -52,9 +57,13 @@ func Load() (Config, error) {
 		WorkerPoll:       time.Duration(poll) * time.Second,
 		BackoffMinutes:   []int{1, 5, 15, 60},
 		Env:              getenv("APP_ENV", "dev"),
+		DevAuthEnabled:   devAuthEnabled,
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")
+	}
+	if cfg.DevAuthEnabled && cfg.Env != "dev" {
+		return Config{}, fmt.Errorf("DEV_AUTH_ENABLED requires APP_ENV=dev")
 	}
 	return cfg, nil
 }
