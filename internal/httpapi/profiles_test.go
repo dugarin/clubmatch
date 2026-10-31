@@ -642,3 +642,12 @@ func TestAutocomplete(t *testing.T) {
 		t.Errorf("long q: status = %d, want 400", rec.Code)
 	}
 }
+
+func TestCreateProfileTwiceConflict(t *testing.T) {
+	e := newTestEnv(t)
+	u := mkProfile(t, e, map[string]any{})
+	rec := call(e.h.Create, http.MethodPost, "/api/v1/profiles", validProfileBody(), u.TelegramUserID)
+	if rec.Code != http.StatusConflict {
+		t.Errorf("second create: %d %s", rec.Code, rec.Body.String())
+	}
+}

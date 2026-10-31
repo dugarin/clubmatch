@@ -32,6 +32,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '201': { description: Анкета создана, content: { application/json: { schema: { $ref: '#/components/schemas/ProfileSelf' } } } }
         '403': { description: Нет приглашения/одобрения или согласия (UC-1 E2/E3); токен приглашения недействителен или погашен (FR-13) }
+        '409': { description: Анкета уже существует (D-3.6) }
         '422': { description: Нарушены обязательные поля (UC-1 E1) }
   /profiles/me:
     get:

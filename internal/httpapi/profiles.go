@@ -305,6 +305,14 @@ func (h *ProfileHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
+	if _, err := h.st.GetProfileByUserID(r.Context(), u.ID); err == nil {
+		writeErr(w, http.StatusConflict, "profile already exists")
+		return
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		slog.Error("profiles: check existing", "err", err)
+		writeErr(w, http.StatusInternalServerError, "internal error")
+		return
+	}
 	useInvite := u.AccessState != store.UserAccessStateApproved && u.AccessState != store.UserAccessStateInvited
 	if useInvite && dto.InviteToken == "" {
 		writeErr(w, http.StatusForbidden, "no access: invite or approval required")
