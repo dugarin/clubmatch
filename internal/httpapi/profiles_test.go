@@ -37,6 +37,8 @@ type testEnv struct {
 	mh   *ModerationHandler
 	dh   *DeckHandler
 	eh   *EvaluationHandler
+	sh   *SearchHandler
+	mth  *MatchesHandler
 }
 
 func newTestEnv(t *testing.T) *testEnv {
@@ -59,6 +61,8 @@ func newTestEnv(t *testing.T) *testEnv {
 		mh:   NewModerationHandler(pool, st, "testbot", "testapp"),
 		dh:   NewDeckHandler(pool, st),
 		eh:   NewEvaluationHandler(pool, st),
+		sh:   NewSearchHandler(pool, st),
+		mth:  NewMatchesHandler(pool, st),
 	}
 }
 

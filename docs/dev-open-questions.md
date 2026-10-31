@@ -31,7 +31,7 @@
 | D-3.7 | GET /api/v1/applications/me реализован (статус заявки для Mini App, ADR-002 F1), но отсутствует в 04-openapi.yaml — внести в контракт? | внести вместе с D-3.5 | открыт |
 | D-3.8 | Назначение модератора — только ручной UPDATE users SET role (FR-15 «конфигурация»). Нужен механизм: seed/CLI/env-список telegram_id? | env-список MODERATOR_TG_IDS при старте (bootstrap) | открыт |
 | D-3.9 | Гонка двух одновременных подач заявки → 2 pending (check-then-insert). Частичный UNIQUE (candidate_id) WHERE state='pending' — делать миграцию? | да, миграция | открыт |
-| D-3.10 | Баг: UpsertProfile всегда ставит is_searchable=true — участник, потерявший последний навык при отзыве тега, восстанавливает видимость любым PATCH (нарушение FR-4). Исправить: is_searchable = (count(skills) > 0) при каждом сохранении | исправить (включено в эпик 4) | открыт |
+| D-3.10 | ~~Баг: UpsertProfile всегда ставит is_searchable=true~~ — исправлено в 87baa81: is_searchable = EXISTS(активный навык) при каждом сохранении | исправлено | закрыт (2026-10-31) |
 | D-3.11 | Схема notification.payload не зафиксирована: сейчас {"application_id": ...} и {"tag": canonical}. Утвердить при 3.5.1 | утвердить состав payload по типам | открыт |
 | D-3.12 | Коды 404/409 для approve/reject/revoke несуществующих/повторных сущностей выбраны [предположение], в OpenAPI не специфицированы | добавить в 04-openapi.yaml | открыт |
 | D-3.13 | RejectUserAccess ставит rejected только из none — кандидат с параллельным invite (invited) его не теряет [предположение] | оставить как есть | открыт |
