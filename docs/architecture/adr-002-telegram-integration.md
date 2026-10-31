@@ -45,6 +45,17 @@
 2a. **Ссылки-приглашения**: формат `https://t.me/<bot>/<miniapp>?startapp=<invite_token>` — токен приходит в Mini App в start-параметре и передаётся в `POST /profiles` при онбординге; одноразовость проверяется на backend (FR-13, ревью F2).
 3. **Уведомления**: outbox-таблица `notification` (`type`, `user_id`, `payload`, `state`, `attempts`, `next_attempt_at`) в той же транзакции, что и событие (матч, решение по заявке, отзыв тега). Worker раз в ≤30 c `[предположение]` выбирает due-записи и отправляет через Bot API; backoff экспоненциальный, параметры — конфигурация (дефолты: 1 мин → 5 → 15 → 60, далее раз в час; утверждено владельцем 2026-10-30).
 4. **Недоставка**: ошибки 403 (бот заблокирован) → `state=blocked`, повторная попытка при следующем `/start` или смене состояния бота; матч и контакт в Mini App не затрагиваются (FR-8).
+4a. **Схема `notification.payload`** (зафиксирована 2026-10-31, D-3.11; типы — `internal/notify/payload.go`):
+
+| type | payload |
+|---|---|
+| `match_created` | `{"match_id": "<uuid>"}` |
+| `application_approved` | `{"application_id": "<uuid>"}` |
+| `application_rejected` | `{"application_id": "<uuid>"}` |
+| `tag_revoked` | `{"tag": "<canonical>"}` |
+| `last_skill_lost` | `{"tag": "<canonical>"}` (отозванный тег, из-за которого потерян последний навык) |
+
+Правила: ключи snake_case, UUID — строки; worker игнорирует неизвестные ключи (новые поля — только опциональные).
 5. **Приём событий**: webhook на том же API backend (только `/start` и минимум команд); polling — fallback для dev-окружения. Webhook защищается `secret_token` (заголовок `X-Telegram-Bot-Api-Secret-Token`, задаётся при `setWebhook`) — без валидного секрета запрос отклоняется 401 (ревью F12).
 
 ## Принятые компромиссы (trade-offs)

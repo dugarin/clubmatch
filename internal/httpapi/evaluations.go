@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/clubmatch/clubmatch/internal/notify"
 	"github.com/clubmatch/clubmatch/internal/store"
 	"github.com/clubmatch/clubmatch/internal/visibility"
 	"github.com/jackc/pgx/v5"
@@ -203,7 +204,7 @@ func (h *EvaluationHandler) discloseMatch(ctx context.Context, qtx *store.Querie
 			return false
 		}
 	}
-	payload, err := json.Marshal(map[string]string{"match_id": uuidString(matchID)})
+	payload, err := notify.MarshalPayload(notify.MatchCreatedPayload{MatchID: uuidString(matchID)})
 	if err != nil {
 		slog.Error("evaluations: marshal payload", "err", err)
 		writeErr(w, http.StatusInternalServerError, "internal error")

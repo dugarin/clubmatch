@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/clubmatch/clubmatch/internal/notify"
 	"github.com/clubmatch/clubmatch/internal/profile"
 	"github.com/clubmatch/clubmatch/internal/store"
 	"github.com/go-chi/chi/v5"
@@ -176,7 +177,7 @@ func (h *ModerationHandler) decide(w http.ResponseWriter, r *http.Request, appro
 		writeErr(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	payload, err := json.Marshal(map[string]string{"application_id": uuidString(appID)})
+	payload, err := notify.MarshalPayload(notify.ApplicationDecidedPayload{ApplicationID: uuidString(appID)})
 	if err != nil {
 		slog.Error("moderation: marshal payload", "err", err)
 		writeErr(w, http.StatusInternalServerError, "internal error")
@@ -326,7 +327,7 @@ func (h *ModerationHandler) RevokeTag(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	payload, err := json.Marshal(map[string]string{"tag": tag.Canonical})
+	payload, err := notify.MarshalPayload(notify.TagRevokedPayload{Tag: tag.Canonical})
 	if err != nil {
 		slog.Error("moderation: marshal payload", "err", err)
 		writeErr(w, http.StatusInternalServerError, "internal error")

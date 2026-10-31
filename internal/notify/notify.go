@@ -83,9 +83,7 @@ var messageTexts = map[string]string{
 func messageText(n store.ClaimDueNotificationsRow) string {
 	text := messageTexts[n.Type]
 	if n.Type == "tag_revoked" {
-		var p struct {
-			Tag string `json:"tag"`
-		}
+		var p TagRevokedPayload
 		if err := json.Unmarshal(n.Payload, &p); err == nil && p.Tag != "" {
 			text = fmt.Sprintf("A tag you created (%q) was removed by moderation.", p.Tag)
 		}
