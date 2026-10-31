@@ -29,7 +29,7 @@
 | D-3.6 | ~~Повторный POST /profiles онбордженным участником~~ — решено 2026-10-31: 409 (реализовано + тест) | — | закрыт (2026-10-31) |
 
 | D-3.7 | ~~GET /api/v1/applications/me отсутствует в 04-openapi.yaml~~ — внесён (2026-10-31) | — | закрыт (2026-10-31) |
-| D-3.8 | Назначение модератора — только ручной UPDATE users SET role (FR-15 «конфигурация»). Нужен механизм: seed/CLI/env-список telegram_id? | env-список MODERATOR_TG_IDS при старте (bootstrap) | открыт |
+| D-3.8 | ~~Назначение модератора~~ — решено 2026-10-31: env-список MODERATOR_TG_IDS, назначение при старте сервера (EnsureModeratorByTelegramID) | реализовано | закрыт (2026-10-31) |
 | D-3.9 | Гонка двух одновременных подач заявки → 2 pending (check-then-insert). Частичный UNIQUE (candidate_id) WHERE state='pending' — делать миграцию? | да, миграция | открыт |
 | D-3.10 | ~~Баг: UpsertProfile всегда ставит is_searchable=true~~ — исправлено в 87baa81: is_searchable = EXISTS(активный навык) при каждом сохранении | исправлено | закрыт (2026-10-31) |
 | D-3.11 | Схема notification.payload не зафиксирована: сейчас {"application_id": ...} и {"tag": canonical}. Утвердить при 3.5.1 | утвердить состав payload по типам | открыт |
