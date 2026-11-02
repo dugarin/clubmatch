@@ -11,6 +11,7 @@ FROM golang:1.26-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
+RUN go install github.com/pressly/goose/v3/cmd/goose@v3.24.1
 COPY . .
 # Реальный dist вместо .gitkeep-заглушки (dist в .gitignore — из контекста его нет)
 COPY --from=web /web/dist ./web/dist
@@ -21,4 +22,6 @@ FROM alpine:3.20
 RUN adduser -D app
 USER app
 COPY --from=build /out/app /app
+COPY --from=build /go/bin/goose /usr/local/bin/goose
+COPY db/migrations /db/migrations
 ENTRYPOINT ["/app"]

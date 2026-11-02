@@ -41,3 +41,10 @@ DEV_AUTH_ENABLED=true
 демонстрационного участника и заполняет БД несколькими карточками и матчем.
 Telegram `initData` не требуется. При любом другом `APP_ENV` включение режима
 запрещено конфигурацией; для обычной разработки держите `DEV_AUTH_ENABLED=false`.
+
+## Публичное окружение
+
+Telegram Mini App разворачивается на Railway: PostgreSQL 16, server и worker.
+HTTPS-домен предоставляет платформа. Конфигурация инфраструктуры — `.railway/railway.ts`;
+порядок деплоя, переменные и настройка webhook описаны в [docs/ops/railway.md](docs/ops/railway.md).
+Self-hosted вариант с Caddy и docker compose сохранён в [docs/ops/stage.md](docs/ops/stage.md).

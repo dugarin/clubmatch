@@ -27,9 +27,12 @@ for notifications.
 - **Frontend**: React 18 + TypeScript + Vite 5 (`web/` directory); the built `dist`
   is embedded into the Go binary via `go:embed` (`web/embed.go`).
 - **Infrastructure**: Docker (single multi-stage `Dockerfile`, `BINARY` argument),
-  docker-compose (dev), `docker-compose.stage.yml` + Caddy (auto-TLS) + Prometheus (stage).
+  docker-compose (dev), Railway for the public Telegram environment
+  (`.railway/railway.ts`, Node.js 22+ for IaC), and `docker-compose.stage.yml` +
+  Caddy (auto-TLS) + Prometheus as the self-hosted alternative.
 - **CI/CD**: GitHub Actions (`lint` → `go test` → docker build + ops config validation
-  + frontend lint/build; SSH deploy — `deploy.yml`, gated by feature flags).
+  + frontend lint/build); Railway deployment is described in `docs/ops/railway.md`;
+  legacy SSH deploy — `deploy.yml`, gated by feature flags.
 
 ## Architecture and processes
 
@@ -144,13 +147,15 @@ Moderator list: `MODERATOR_TG_IDS` (comma-separated telegram ids).
 ## Deployment and operations
 
 - Dev: `docker-compose.yml` (postgres + migrate + server + worker).
-- Stage: `docker-compose.stage.yml` — same services + Caddy (automatic TLS via
-  `STAGE_DOMAIN`) + `monitoring` profile (Prometheus, node-exporter).
+- Public Telegram environment: Railway (`Postgres`, `server`, `worker`), IaC in
+  `.railway/railway.ts`; variables and secrets are unmanaged by IaC. Node.js 22+
+  is required for `railway config plan/apply`. Procedure — `docs/ops/railway.md`.
+- Self-hosted stage: `docker-compose.stage.yml` — same services + Caddy (automatic
+  TLS via `STAGE_DOMAIN`) + `monitoring` profile (Prometheus, node-exporter).
   First-deploy order and server requirements — `docs/ops/stage.md`.
-- CD (`.github/workflows/deploy.yml`): SSH deploy from git (build on the server),
-  stage — push to `main`, prod — `v*` tags; both jobs are disabled by feature flags
-  `DEPLOY_STAGE_ENABLED` / `DEPLOY_PROD_ENABLED` until secrets are configured.
-  Procedure and rollback — `docs/ops/deploy.md`.
+- Legacy SSH CD (`.github/workflows/deploy.yml`): stage — push to `main`, prod —
+  `v*` tags; both jobs are disabled by feature flags `DEPLOY_STAGE_ENABLED` /
+  `DEPLOY_PROD_ENABLED`. Procedure and rollback — `docs/ops/deploy.md`.
 - Images are not published to a registry yet (open question Q-1.2, ADR-001).
 - Backups: `ops/backup.sh` (pg_dump, `RETENTION_DAYS` rotation); restore — `ops/restore.sh`.
 - Health/readiness: `GET /healthz`, `GET /readyz`; metrics: `/metrics` (server

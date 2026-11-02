@@ -24,7 +24,7 @@
 | № | Артефакт | Содержание | Статус |
 |---|---|---|---|
 | 2.1 | Доменная модель (ER) | Анкета, Тег + алиасы, Оценка, Матч, Заявка, Приглашение, Журнал раскрытия контактов | [x] accepted 2026-10-30: [architecture/01-domain-model.md](architecture/01-domain-model.md) |
-| 2.2 | ADR-1: стек и хранилище | Postgres как кандидат (полнотекстовый поиск рус./англ. из Р2) + ≥1 альтернатива | [x] accepted 2026-10-30: [architecture/adr-001-storage-stack.md](architecture/adr-001-storage-stack.md) (PG 16, Go, self-hosted) |
+| 2.2 | ADR-1: стек и хранилище | Postgres как кандидат (полнотекстовый поиск рус./англ. из Р2) + ≥1 альтернатива | [x] accepted 2026-10-30: [architecture/adr-001-storage-stack.md](architecture/adr-001-storage-stack.md) (PG 16, Go; публичный хостинг Railway выбран 2026-11-02) |
 | 2.3 | ADR-2: интеграция Telegram | Bot API + валидация `initData` (NFR-7), доставка/повтор уведомлений (Р3, NFR-12) | [x] accepted 2026-10-30: [architecture/adr-002-telegram-integration.md](architecture/adr-002-telegram-integration.md) |
 | 2.4 | ADR-3: поиск и ранжирование | Реализация Р2: нормализация, алиасы тегов, приоритеты полей, пагинация | [x] accepted 2026-10-30: [architecture/adr-003-search-ranking.md](architecture/adr-003-search-ranking.md) |
 | 2.5 | ADR-4: видимость полей и приватность | Server-side фильтрация полей (Р6, FR-14, AC-7), журнал раскрытия (Р8) | [x] accepted 2026-10-30: [architecture/adr-004-visibility-privacy.md](architecture/adr-004-visibility-privacy.md) |
