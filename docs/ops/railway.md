@@ -54,12 +54,14 @@ openssl rand -hex 32 | railway variable set --service server --stdin TELEGRAM_WE
 
 ## Деплой
 
-Первоначально и при ручном обновлении код загружается из текущего рабочего каталога:
+Текущий публичный адрес: `https://server-production-3725.up.railway.app`. Оба приложения подключены к GitHub `dugarin/clubmatch`, ветка `main`. Для явного обновления из последнего коммита:
 
 ```bash
-railway up --service server --ci
-railway up --service worker --ci
+railway redeploy --service server --from-source --yes
+railway redeploy --service worker --from-source --yes
 ```
+
+Автоматический запуск по push пока не подтверждён. Альтернатива — загрузка текущего рабочего каталога через `railway up --service <имя> --ci`, но во время первоначальной настройки этот канал несколько раз обрывался по сетевому таймауту.
 
 Проверка:
 

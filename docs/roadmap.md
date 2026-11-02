@@ -53,12 +53,12 @@ ADR-001…004 и доменная модель — accepted; UC-1 дополне
 |---|---|---|
 | 3.0 | Декомпозиция: 8 эпиков, 29 задач (вкл. окружение: dev/stage, CI/CD, мониторинг), граф зависимостей | [x] accepted 2026-10-30: [phase-3-plan.md](phase-3-plan.md) (MVP-1 = эпики 0–4; EN-тексты пишет команда; окружение — сразу полностью) |
 
-### Прогресс фазы 3 (2026-10-31)
+### Прогресс фазы 3 (2026-11-02)
 
 | Задача | Статус |
 |---|---|
 | 3.0.1–3.0.4 каркас, dev-окружение | [x] |
-| 3.0.5–3.0.8 CI, stage, CD, мониторинг | [~] локальный stage-прогон 2026-10-31: миграции, HTTPS, SPA, Prometheus, бэкап/восстановление — успешно; `/metrics` закрыт на Caddy. Реальный stage/CD — ждёт сервер (Q-1.3) и секреты STAGE_*/PROD_* |
+| 3.0.5–3.0.8 CI, stage, CD, мониторинг | [~] Railway: PostgreSQL 16, server и worker запущены, GitHub-источник `main`, миграции 8 применены, HTTPS/healthz/readyz/SPA проверены. Prometheus и бэкапы на Railway не настроены. Деплой коммита `c6a6b38` (приватные метрики) не применён: server/worker остались на предыдущих успешных контейнерах после сбоя BuildKit |
 | 3.1.1 спайк T-2 (FTS) | [x] [spikes/fts-bilingual.md](spikes/fts-bilingual.md) |
 | 3.1.2 корпус AC-5 (T-3) | [x] [spikes/ac5-corpus.md](spikes/ac5-corpus.md) + search_corpus_test |
 | 3.1.3 спайк T-1 (`tg://user?id`) | [x] исследование официальной документации; [spikes/tg-user-link.md](spikes/tg-user-link.md), Q10 уточнён (**spec 1.3**) |
@@ -68,10 +68,12 @@ ADR-001…004 и доменная модель — accepted; UC-1 дополне
 | 3.5.1–3.5.2 worker уведомлений, удаление анкеты | [x] |
 | 3.6.1–3.6.5 Mini App UI (MVP-1) | [x] |
 | 3.6.6 UI модерации | [ ] MVP-2 |
-| 3.7.1 метрики | [x] |
-| 3.7.2 приёмка AC | [~] покрытие тестами: [acceptance-report.md](acceptance-report.md); ручные проверки NFR-1/2/3/4/11 и E2E — после stage |
+| 3.7.1 метрики | [x] в коде server и worker слушают приватный `:9091`; публичный `/metrics` возвращает 404 после ожидаемого redeploy |
+| 3.7.2 приёмка AC | [~] покрытие тестами: [acceptance-report.md](acceptance-report.md); ручные NFR и E2E в реальном Telegram — после настройки Railway webhook/Mini App |
 
 Дополнительно 2026-10-31 (вечер): разбор открытых вопросов — закрыты D-1.1 (MVP-поиск только по тегам, **spec 1.2**), D-2.1, D-2.2, D-3.1 (алиасы модератором), D-3.2 (revoked → 422), D-3.3 (non-goal), D-3.4, D-3.5, D-3.6 (409), D-3.7, D-3.8 (MODERATOR_TG_IDS). Репозиторий запушен на GitHub (main).
+
+2026-11-02 выбран Railway (регион `iad`, Вирджиния, США). Публичный адрес: `https://server-production-3725.up.railway.app`. IaC — `.railway/railway.ts`, инструкция — [ops/railway.md](ops/railway.md). Коммиты `c892dbe` (Railway) и `c6a6b38` (приватные метрики) отправлены в `main`; Go build/test и golangci-lint — успешно. `TELEGRAM_WEBHOOK_SECRET` сгенерирован и сохранён в переменных server; `TELEGRAM_BOT_TOKEN` ещё не задан.
 
 ### Правило сессий
 
@@ -79,15 +81,18 @@ ADR-001…004 и доменная модель — accepted; UC-1 дополне
 
 ### Следующая сессия — начать с
 
-1. ~~Разбор открытых вопросов [dev-open-questions.md](dev-open-questions.md)~~ — все 17 закрыты (2026-10-31), включая D-3.9, D-3.11–D-3.13, D-6.1 (embed dist), D-6.2 (UI модерации — MVP-2, подтверждено).
-2. ~~Спайк T-1 (`tg://user?id`)~~ — завершён 2026-10-31 исследованием официальной документации; `tg://user?id` не используется в Mini App, Q10 уточнён.
-3. Деплой stage (3.0.6–3.0.8): нужен сервер (Q-1.3) и секреты STAGE_*/PROD_*.
-4. Ручные проверки NFR-1/2/3/4/11 на stage.
+1. Повторить `railway redeploy --service server --from-source --yes` и то же для worker. Предыдущие сборки `d76cb234`/`f227afe5` упали из-за инфраструктурной ошибки BuildKit (`buildkitd.sock`), не из-за тестов или кода. Убедиться, что развёрнут `c6a6b38`, затем проверить `/healthz`, `/readyz`, SPA и публичный `/metrics` = 404.
+2. Задать одинаковый `TELEGRAM_BOT_TOKEN` в Railway server и worker (пользователь добавляет секрет через Dashboard, не в чат).
+3. Установить webhook на `https://server-production-3725.up.railway.app/telegram/webhook` с уже сохранённым `TELEGRAM_WEBHOOK_SECRET`; указать корневой URL в @BotFather как Mini App URL.
+4. Задать `TELEGRAM_BOT_USERNAME`, `TELEGRAM_MINIAPP_NAME`, `MODERATOR_TG_IDS` в server.
+5. Провести E2E UC-1…UC-7 в реальном Telegram и ручные проверки NFR-1/2/3/4/11.
 
-Заметки для следующей сессии: субагенты недоступны (модель `kimi-code-plan-global/k3.1` не найдена — работать в основной сессии). Команды: `make migrate-up` (DATABASE_URL=postgres://clubmatch:clubmatch@localhost:5432/clubmatch?sslmode=disable), тесты `go test -p 1 ./internal/...` (Go: ~/sdk/go/bin), линтер — docker-образ `golangci/golangci-lint:latest`, фронт — `cd web && npm run build && npm run lint`.
+Заметки для следующей сессии: Railway CLI авторизован, проект `clubmatch` уже связан с репозиторием. Для `railway config plan/apply` нужен Node.js 22 (`nvm use 22`; установлен 22.23.4), затем `npm ci`. Переменные — unmanaged, секреты не хранить в IaC. Автоматический запуск деплоя по push не подтверждён; использовать `railway redeploy --from-source`. Субагенты недоступны — работать в основной сессии.
 
 ## Блокеры и зависимости
 
-- Stage-сервер, домен и секреты STAGE_*/PROD_* для деплоя и ручной приёмки.
+- Повторный Railway redeploy коммита `c6a6b38` после временного сбоя BuildKit.
+- Telegram bot token и действия владельца в @BotFather; затем webhook и ручная приёмка.
+- Для полноценной эксплуатации Railway ещё нужны бэкапы PostgreSQL и доставка алертов.
 
-Статус: active (2026-10-31). Фаза 1 — выполнена; фаза 2 — выполнена; фаза 3 — MVP-1 реализован (бэкенд + Mini App + CI), спайки T-1…T-3 завершены; остались деплой stage и ручная приёмка. Продолжение — блок «Следующая сессия». См. [README](../README.md), [fix-plan](fix-plan.md).
+Статус: active (2026-11-02). Фазы 1–2 выполнены; MVP-1 развёрнут на Railway в базовой конфигурации. Остались применение последнего коммита, настройка Telegram и ручная приёмка. Продолжение — блок «Следующая сессия». См. [README](../README.md), [fix-plan](fix-plan.md).
