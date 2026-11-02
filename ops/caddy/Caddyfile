@@ -4,7 +4,7 @@
 # -e STAGE_DOMAIN=... -v $PWD/ops/caddy/Caddyfile:/etc/caddy/Caddyfile:ro \
 # caddy:2.11.7-alpine caddy validate --config /etc/caddy/Caddyfile
 #
-# /metrics наружу НЕ проксируется: Prometheus скрейпит server:8080 внутри compose-сети.
+# /metrics наружу НЕ проксируется: Prometheus скрейпит server:9091 внутри compose-сети.
 {
 	# email для уведомлений Let's Encrypt (истечение/проблемы) — раскомментировать и указать:
 	# email admin@example.com

@@ -14,6 +14,7 @@ import (
 	"github.com/clubmatch/clubmatch/internal/devmode"
 	"github.com/clubmatch/clubmatch/internal/httpapi"
 	"github.com/clubmatch/clubmatch/internal/logging"
+	"github.com/clubmatch/clubmatch/internal/observ"
 	"github.com/clubmatch/clubmatch/internal/store"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -57,6 +58,13 @@ func main() {
 		Handler:           httpapi.NewRouter(db, cfg),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
+	metricsMux := http.NewServeMux()
+	metricsMux.Handle("/metrics", observ.MetricsHandler())
+	metricsSrv := &http.Server{
+		Addr:              cfg.MetricsAddr,
+		Handler:           metricsMux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
 
 	go func() {
 		log.Info("listening", "addr", cfg.HTTPAddr)
@@ -65,10 +73,17 @@ func main() {
 			os.Exit(1)
 		}
 	}()
+	go func() {
+		log.Info("metrics listening", "addr", cfg.MetricsAddr)
+		if err := metricsSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error("metrics http", "err", err)
+		}
+	}()
 
 	<-ctx.Done()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(shutdownCtx)
+	_ = metricsSrv.Shutdown(shutdownCtx)
 	log.Info("stopped")
 }

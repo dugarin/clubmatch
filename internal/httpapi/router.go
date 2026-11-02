@@ -18,9 +18,7 @@ func NewRouter(db *pgxpool.Pool, cfg config.Config) http.Handler {
 	st := store.NewStore(db)
 	r := chi.NewRouter()
 	r.Use(observ.LatencyMiddleware)
-	r.Get("/metrics", func(w http.ResponseWriter, r *http.Request) {
-		observ.MetricsHandler().ServeHTTP(w, r)
-	})
+	r.Get("/metrics", http.NotFound)
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})

@@ -72,7 +72,7 @@ curl -fsS "https://<RAILWAY_DOMAIN>/healthz"
 curl -fsS "https://<RAILWAY_DOMAIN>/readyz"
 ```
 
-`/metrics` не должен публиковаться как отдельный публичный маршрут без проверки политики доступа. Для production-эксплуатации нужно отдельно настроить резервное копирование PostgreSQL и доставку алертов; существующие `ops/backup.sh`/`ops/restore.sh` рассчитаны на docker compose и напрямую здесь не применяются.
+На публичном HTTP-порту `server` маршрут `/metrics` возвращает 404. Метрики server и worker доступны только на отдельном приватном listener `METRICS_ADDR` (`:9091`), для которого публичный домен не создаётся. Для production-эксплуатации нужно отдельно настроить резервное копирование PostgreSQL и доставку алертов; существующие `ops/backup.sh`/`ops/restore.sh` рассчитаны на docker compose и напрямую здесь не применяются.
 
 ## Telegram
 

@@ -158,5 +158,5 @@ Moderator list: `MODERATOR_TG_IDS` (comma-separated telegram ids).
   `DEPLOY_PROD_ENABLED`. Procedure and rollback — `docs/ops/deploy.md`.
 - Images are not published to a registry yet (open question Q-1.2, ADR-001).
 - Backups: `ops/backup.sh` (pg_dump, `RETENTION_DAYS` rotation); restore — `ops/restore.sh`.
-- Health/readiness: `GET /healthz`, `GET /readyz`; metrics: `/metrics` (server
-  on the main port, worker on `METRICS_ADDR`).
+- Health/readiness: `GET /healthz`, `GET /readyz`; server and worker expose
+  `/metrics` only on the separate private `METRICS_ADDR` listener (`:9091`).
